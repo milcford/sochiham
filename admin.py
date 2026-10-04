@@ -46,26 +46,11 @@ def qrz_lookup(call):
     return {"callsign": tag_text(data, "call") or call, "surname": tag_text(data, "surname"), "name": tag_text(data, "name"), "patronymic": tag_text(data, "name2"), "city": tag_text(data, "city").rstrip(","), "locator": (tag_text(data, "locator") or tag_text(data, "grid"))[:4]}
 
 PAGE = r'''<!DOCTYPE html><html lang=ru><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>Люди</title>
-<style>
-body{font-family:system-ui,sans-serif;background:#faf7f4;margin:0;color:#1c1917}
-main{max-width:720px;margin:0 auto;padding:16px}
-h1{font-size:28px}
-form{background:#fff;border-radius:16px;padding:16px;margin:12px 0}
-input,select{display:block;width:100%;box-sizing:border-box;padding:14px;margin:8px 0;font-size:18px;border:1px solid #e7e5e4;border-radius:12px}
-button{display:block;width:100%;box-sizing:border-box;background:#e85d04;color:#fff;border:0;border-radius:12px;padding:14px;font-size:18px;font-weight:700;margin-top:10px}
-button.ghost{background:#fff;color:#9a3412;border:1px solid #e85d04}
-.phone{display:grid;grid-template-columns:110px 1fr;gap:8px}
-.phone select,.phone input{margin:0}
-.hint{color:#78716c;margin:8px 0 0}
-.card{background:#fff;border-radius:16px;padding:14px;margin:10px 0}
-.card .actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.err{color:#b91c1c}
-.table-wrap{display:none}
-</style></head>
+<style>body{font-family:system-ui,sans-serif;background:#faf7f4;margin:0;color:#1c1917}main{max-width:720px;margin:0 auto;padding:16px}h1{font-size:28px}form{background:#fff;border-radius:16px;padding:16px;margin:12px 0}input,select{display:block;width:100%;box-sizing:border-box;padding:14px;margin:8px 0;font-size:18px;border:1px solid #e7e5e4;border-radius:12px}button{display:block;width:100%;box-sizing:border-box;background:#e85d04;color:#fff;border:0;border-radius:12px;padding:14px;font-size:18px;font-weight:700;margin-top:10px}button.ghost{background:#fff;color:#9a3412;border:1px solid #e85d04}.phone{display:grid;grid-template-columns:110px 1fr;gap:8px}.phone select,.phone input{margin:0}.hint{color:#78716c;margin:8px 0 0}.card{background:#fff;border-radius:16px;padding:14px;margin:10px 0}.card .actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}.err{color:#b91c1c}.table-wrap{display:none}</style></head>
 <body><main><h1>Радиолюбители</h1>
 <form id=login><input name=password type=password placeholder="Пароль админки" required><button>Войти</button><p class=err id=login-err></p></form>
 <div id=app hidden><form id=edit><input name=id type=hidden><input name=phone type=hidden><input name=callsign placeholder=Позывной required><button class=ghost type=button onclick=lookup()>Найти на qrz.ru</button><p class=err id=qrz-err></p><input name=surname placeholder=Фамилия><input name=name placeholder=Имя required><input name=patronymic placeholder="Отчество, если есть"><input name=city placeholder=Город><select name=locator id=locator><option value="">Локатор</option></select><p class=hint>Телефон</p><div class=phone><select id=code><option value="+7">+7</option><option value="+375">+375</option><option value="+374">+374</option><option value="+995">+995</option><option value="+380">+380</option></select><input id=number inputmode=numeric placeholder="918 123-45-67" maxlength=13></div><button>Сохранить</button></form>
-<div id=cards></div><div class=table-wrap><table><tbody id=rows></tbody></table></div></div></main>
+<div id=cards></div></div></main>
 <script>
 const login=document.getElementById('login'), app=document.getElementById('app');
 function mask(v){const d=v.replace(/\D/g,'').slice(0,10); let s=d.slice(0,3); if(d.length>3)s+=' '+d.slice(3,6); if(d.length>6)s+='-'+d.slice(6,8); if(d.length>8)s+='-'+d.slice(8,10); return s;}
@@ -89,6 +74,15 @@ class Handler(BaseHTTPRequestHandler):
         if extra: self.send_header("Set-Cookie", extra)
         self.end_headers(); self.wfile.write(data)
     def do_GET(self):
+        if self.path.startswith("/api/calls"):
+            rows = psql("SELECT callsign, COALESCE(name,''), COALESCE(locator,'') FROM operators ORDER BY callsign;")
+            items = [dict(zip(["callsign","name","locator"], line.split("|"))) for line in rows.splitlines() if line.strip()]
+            body = json.dumps(items, ensure_ascii=False).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers(); self.wfile.write(body); return
         if not self.cookie_ok() and self.path.startswith("/api/"): return self.send(401, '{"error":"auth"}', "application/json")
         if self.path.startswith("/api/locators"):
             rows = psql("SELECT code, title FROM locators ORDER BY code;")
