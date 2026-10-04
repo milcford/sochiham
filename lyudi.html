@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Добавить себя</title>
+<style>
+  body { font-family: system-ui, sans-serif; background:#faf7f4; margin:0; color:#1c1917; }
+  main { max-width:720px; margin:0 auto; padding:16px; }
+  form, .card { background:#fff; border-radius:16px; padding:16px; margin:12px 0; }
+  input, select { display:block; width:100%; box-sizing:border-box; padding:14px; margin:8px 0; font-size:18px; border:1px solid #e7e5e4; border-radius:12px; }
+  button { display:block; width:100%; background:#e85d04; color:#fff; border:0; border-radius:12px; padding:14px; font-size:18px; font-weight:700; margin-top:10px; }
+  button.ghost { background:#fff; color:#9a3412; border:1px solid #e85d04; }
+  .phone { display:grid; grid-template-columns:110px 1fr; gap:8px; }
+  .phone select, .phone input { margin:0; }
+  a { color:#e85d04; }
+  .err { color:#b91c1c; }
+</style>
+</head>
+<body>
+<main>
+  <p><a href="index.html">На портал</a></p>
+  <h1>Добавить себя</h1>
+  <p>Впишите свой позывной. Если он уже есть, данные обновятся. Удалять здесь нельзя.</p>
+  <form id="edit">
+    <input name="phone" type="hidden">
+    <input name="callsign" placeholder="Позывной" required>
+    <button class="ghost" type="button" onclick="lookup()">Найти на qrz.ru</button>
+    <p class="err" id="qrz-err"></p>
+    <input name="surname" placeholder="Фамилия">
+    <input name="name" placeholder="Имя" required>
+    <input name="patronymic" placeholder="Отчество, если есть">
+    <input name="city" placeholder="Город">
+    <select name="locator" id="locator"><option value="">Локатор</option></select>
+    <p>Телефон</p>
+    <div class="phone">
+      <select id="code"><option value="+7">+7</option><option value="+375">+375</option><option value="+374">+374</option><option value="+995">+995</option><option value="+380">+380</option></select>
+      <input id="number" inputmode="numeric" placeholder="918 123-45-67" maxlength="13">
+    </div>
+    <button>Сохранить</button>
+    <p class="err" id="err"></p>
+  </form>
+  <div class="card" id="done" hidden>Сохранено. Позывной появится в списке Кубка.</div>
+</main>
+<script>
+function mask(v){const d=v.replace(/\D/g,'').slice(0,10); let s=d.slice(0,3); if(d.length>3)s+=' '+d.slice(3,6); if(d.length>6)s+='-'+d.slice(6,8); if(d.length>8)s+='-'+d.slice(8,10); return s;}
+document.getElementById('number').addEventListener('input', e=>{e.target.value=mask(e.target.value);});
+fetch('/api/locators').then(r=>r.json()).then(list=>{document.getElementById('locator').innerHTML='<option value="">Локатор</option>'+list.map(x=>'<option value="'+x.code+'">'+x.code+' — '+x.title+'</option>').join('');});
+function fill(p){const f=document.getElementById('edit'); for (const k of ['callsign','surname','name','patronymic','city','locator']) f[k].value=p[k]||''; const digits=(p.phone||'').replace(/\D/g,''); const code=['+375','+374','+995','+380','+7'].find(c=>digits.startsWith(c.slice(1)))||'+7'; document.getElementById('code').value=code; document.getElementById('number').value=mask(digits.slice(code.length-1));}
+async function lookup(){document.getElementById('qrz-err').textContent=''; try { fill(await fetch('/api/qrz?call='+encodeURIComponent(document.getElementById('edit').callsign.value)).then(r=>r.json())); } catch(e){ document.getElementById('qrz-err').textContent='Не нашлось'; }}
+document.getElementById('edit').onsubmit=async(e)=>{e.preventDefault(); const digits=document.getElementById('number').value.replace(/\D/g,''); e.target.phone.value=digits?document.getElementById('code').value+' '+document.getElementById('number').value:''; const res=await fetch('/api/join',{method:'POST', body:new URLSearchParams(new FormData(e.target))}); if(!res.ok){document.getElementById('err').textContent='Не сохранилось'; return;} document.getElementById('done').hidden=false; e.target.reset(); document.getElementById('number').value='';};
+</script>
+</body>
+</html>
