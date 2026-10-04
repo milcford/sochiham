@@ -18,13 +18,18 @@
   .wait { border-left:6px solid #b45309; }
   a { color:#e85d04; }
   .leaflet-control-attribution { display:none; }
+  table { width:100%; border-collapse:collapse; background:#fff; border-radius:16px; overflow:hidden; }
+  td, th { text-align:left; padding:12px; border-bottom:1px solid #f5f5f4; font-size:18px; }
+  td.pts { font-weight:800; font-size:22px; }
 </style>
 </head>
 <body>
 <main>
   <p><a href="index.html">На портал</a></p>
   <h1>Кубок Сочи, УКВ</h1>
-  <p>Каждый ставит на карте точку, откуда работал. Когда второй сделает то же, километры по прямой посчитаются сами. 144 МГц — 1 очко за км, 430 МГц — 2, 1,2 ГГц — 3.</p>
+  <p>Связь сохраняется сразу. Очки появляются, когда вторая сторона тоже отметила точку. 144 МГц — 1 за км, 430 МГц — 2, 1,2 ГГц — 3.</p>
+  <h2>У кого сколько очков</h2>
+  <table><thead><tr><th>Место</th><th>Позывной</th><th>Очки</th></tr></thead><tbody id="score"></tbody></table>
   <form class="card" onsubmit="addQso(event)">
     <label>Ваш позывной</label>
     <input id="my-call" list="calls" required autocomplete="off">
@@ -44,7 +49,7 @@
     <p id="place">Точка ещё не выбрана</p>
     <button>Сохранить связь</button>
   </form>
-  <button class="ghost" type="button" onclick="loadCheck()">Сверить записи</button>
+  <h2>Записи</h2>
   <div id="qso-list"></div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -81,12 +86,20 @@ async function addQso(e) {
 }
 async function loadCheck() {
   const rows = await fetch(api + '/api/qso').then(r => r.json());
+  const totals = {};
+  rows.forEach(r => {
+    const pts = r.km ? Math.round(Number(r.km) * (rates[r.band] || 1)) : 0;
+    totals[r.my_call] = (totals[r.my_call] || 0) + pts;
+  });
+  const board = Object.entries(totals).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  document.getElementById('score').innerHTML = board.map((row, i) => '<tr><td>' + (i + 1) + '</td><td>' + row[0] + '</td><td class=pts>' + row[1] + '</td></tr>').join('') || '<tr><td colspan=3>Пока нет записей</td></tr>';
   document.getElementById('qso-list').innerHTML = rows.map(r => {
-    const pts = r.km ? Math.round(Number(r.km) * rates[r.band] || 0) : '';
+    const pts = r.km ? Math.round(Number(r.km) * (rates[r.band] || 1)) : '';
     return '<div class="card ' + (r.pair === 'yes' ? 'ok' : 'wait') + '"><b>' + r.my_call + ' — ' + r.dx_call + ' · ' + r.band + '</b><p>' + r.worked_at + (r.km ? ' · ' + r.km + ' км · ' + pts + ' очков' : '') + '</p><p>' + (r.pair === 'yes' ? 'Обе точки есть, это одна связь' : 'Ждёт точку второй стороны') + '</p></div>';
   }).join('');
 }
 loadCheck();
+setInterval(loadCheck, 15000);
 </script>
 </body>
 </html>
