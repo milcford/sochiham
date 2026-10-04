@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Админка портала: люди в PostgreSQL. Запуск: python3 admin.py"""
 import hashlib, hmac, json, os, secrets, subprocess
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs
-HOST, PORT = "127.0.0.1", int(os.environ.get("ADMIN_PORT", "8081"))
+HOST = os.environ.get("ADMIN_HOST", "127.0.0.1")
+PORT = int(os.environ.get("ADMIN_PORT", "8081"))
 PASSWORD = os.environ.get("ADMIN_PASSWORD", "")
 DB = os.environ.get("PGDATABASE", "sochiham")
 DB_USER = os.environ.get("PGUSER", "sochiham")
@@ -27,7 +27,7 @@ def q(value):
 
 PAGE = """<!DOCTYPE html><html lang=ru><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>Люди</title>
 <style>body{font-family:system-ui,sans-serif;background:#faf7f4;margin:0;color:#1c1917}main{max-width:880px;margin:0 auto;padding:16px}form{background:#fff;border-radius:16px;padding:16px;margin:12px 0}input{width:100%;padding:12px;margin:6px 0;font-size:16px;border:1px solid #e7e5e4;border-radius:12px}button{background:#e85d04;color:#fff;border:0;border-radius:12px;padding:12px 16px;font-weight:700}button.ghost{background:#fff;color:#b91c1c;border:1px solid #b91c1c}table{width:100%;border-collapse:collapse;background:#fff}td,th{text-align:left;padding:10px;border-bottom:1px solid #f5f5f4}.err{color:#b91c1c}</style></head>
-<body><main><h1>Радиолюбители</h1><p>Страница открывается только на этом компьютере.</p>
+<body><main><h1>Радиолюбители</h1>
 <form id=login><input name=password type=password placeholder="Пароль админки" required><button>Войти</button><p class=err id=login-err></p></form>
 <div id=app hidden><form id=edit><input name=id type=hidden><input name=callsign placeholder=Позывной required><input name=name placeholder=Имя required><input name=city placeholder=Город><input name=locator placeholder=Локатор><input name=phone placeholder=Телефон><input name=messenger placeholder=Max><button>Сохранить</button></form>
 <table><thead><tr><th>Позывной</th><th>Имя</th><th>Город</th><th></th></tr></thead><tbody id=rows></tbody></table></div></main>
