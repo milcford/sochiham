@@ -1,1 +1,119 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Кубок Сочи УКВ — подсчёт</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  body { font-family: system-ui, sans-serif; background:#faf7f4; margin:0; color:#1c1917; }
+  main { max-width:720px; margin:0 auto; padding:16px; }
+  .card { background:#fff; border-radius:16px; padding:16px; margin:10px 0; }
+  label { display:block; margin-top:10px; font-weight:700; }
+  input, select { width:100%; padding:12px; margin:6px 0; font-size:16px; border-radius:12px; border:1px solid #e7e5e4; box-sizing:border-box; }
+  #map { height:360px; border-radius:16px; margin-top:8px; }
+  button { width:100%; background:#e85d04; color:#fff; border:0; border-radius:14px; padding:14px; font-size:18px; font-weight:700; margin-top:12px; }
+  .ok { border-left:6px solid #1b7a3a; }
+  .wait { border-left:6px solid #b45309; }
+  a { color:#e85d04; }
+  .leaflet-control-attribution { display:none; }
+  table { width:100%; border-collapse:collapse; background:#fff; border-radius:16px; overflow:hidden; }
+  td, th { text-align:left; padding:12px; border-bottom:1px solid #f5f5f4; font-size:18px; }
+  td.pts { font-weight:800; font-size:22px; }
+</style>
+</head>
+<body>
+<main>
+  <p><a href="index.html">На портал</a></p>
+  <h1>Кубок Сочи, УКВ</h1>
+  <p>Точка на карте сама даёт локатор. Километры считаются по прямой. Если оба в одном малом квадрате, очки фиксированные: 2, 2 и 3.</p>
+  <form class="card" onsubmit="addQso(event)">
+    <label>Ваш позывной</label>
+    <input id="my-call" list="calls" required autocomplete="off">
+    <label>Позывной корреспондента</label>
+    <input id="dx-call" list="calls" required autocomplete="off">
+    <datalist id="calls"></datalist>
+    <label>Время связи</label>
+    <input id="when" type="datetime-local" required>
+    <label>Диапазон</label>
+    <select id="band">
+      <option value="144">144 МГц, 1 очко за км</option>
+      <option value="430">430 МГц, 2 очка за км</option>
+      <option value="1200">1,2 ГГц, 3 очка за км</option>
+    </select>
+    <label>Откуда работали. Нажмите на карту</label>
+    <div id="map"></div>
+    <p id="place">Точка ещё не выбрана</p>
+    <button>Сохранить связь</button>
+  </form>
+  <h2>Записи</h2>
+  <div id="qso-list"></div>
+  <h2>У кого сколько очков</h2>
+  <table><thead><tr><th>Место</th><th>Позывной</th><th>Очки</th></tr></thead><tbody id="score"></tbody></table>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
 const api = '';
+const map = L.map('map', { attributionControl: false }).setView([43.60, 39.73], 11);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18 }).addTo(map);
+let marker, point, locator = '';
+function toLocator(lat, lon) {
+  const A = 'ABCDEFGHIJKLMNOPQRSTUVWX';
+  let x = lon + 180, y = lat + 90;
+  let s = A[Math.floor(x / 20)] + A[Math.floor(y / 10)];
+  x %= 20; y %= 10;
+  s += Math.floor(x / 2) + '' + Math.floor(y);
+  x = (x % 2) * 12; y = (y % 1) * 24;
+  return s + A[Math.floor(x)].toLowerCase() + A[Math.floor(y)].toLowerCase();
+}
+map.on('click', e => {
+  point = e.latlng;
+  locator = toLocator(point.lat, point.lng);
+  if (marker) marker.setLatLng(point); else marker = L.marker(point).addTo(map);
+  document.getElementById('place').textContent = locator + ' · ' + point.lat.toFixed(5) + ', ' + point.lng.toFixed(5);
+});
+const now = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+document.getElementById('when').value = now;
+fetch(api + '/api/calls').then(r => r.json()).then(list => {
+  document.getElementById('calls').innerHTML = list.map(p => '<option value="' + p.callsign + '">' + p.callsign + ' ' + (p.name || '') + '</option>').join('');
+}).catch(() => {});
+const rates = { "144": 1, "430": 2, "1200": 3 };
+const square = { "144": 2, "430": 2, "1200": 3 };
+function pointsOf(r) {
+  if (r.pair !== 'yes') return 0;
+  const same = r.my_loc && r.dx_loc && r.my_loc.slice(0, 4) === r.dx_loc.slice(0, 4);
+  if (same) return square[r.band] || 2;
+  return r.km ? Math.round(Number(r.km) * (rates[r.band] || 1)) : 0;
+}
+async function addQso(e) {
+  e.preventDefault();
+  if (!point) { alert('Нажмите на карту, откуда работали'); return; }
+  const body = new URLSearchParams({
+    my_call: document.getElementById('my-call').value.trim().toUpperCase(),
+    dx_call: document.getElementById('dx-call').value.trim().toUpperCase(),
+    when: document.getElementById('when').value,
+    band: document.getElementById('band').value,
+    lat: String(point.lat), lon: String(point.lng), locator
+  });
+  const res = await fetch(api + '/api/qso', { method: 'POST', body });
+  if (!res.ok) { alert('Не сохранилось. Проверьте, что портал запущен.'); return; }
+  document.getElementById('dx-call').value = '';
+  loadCheck();
+}
+async function loadCheck() {
+  const rows = await fetch(api + '/api/qso').then(r => r.json());
+  const totals = {};
+  rows.forEach(r => { totals[r.my_call] = (totals[r.my_call] || 0) + pointsOf(r); });
+  const board = Object.entries(totals).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  document.getElementById('score').innerHTML = board.map((row, i) => '<tr><td>' + (i + 1) + '</td><td>' + row[0] + '</td><td class=pts>' + row[1] + '</td></tr>').join('') || '<tr><td colspan=3>Пока нет записей</td></tr>';
+  document.getElementById('qso-list').innerHTML = rows.map(r => {
+    const pts = pointsOf(r);
+    const same = r.my_loc && r.dx_loc && r.my_loc.slice(0, 4) === r.dx_loc.slice(0, 4);
+    return '<div class="card ' + (r.pair === 'yes' ? 'ok' : 'wait') + '"><b>' + r.my_call + ' ' + (r.my_loc || '') + ' — ' + r.dx_call + ' ' + (r.dx_loc || '') + ' · ' + r.band + '</b><p>' + r.worked_at + (r.pair === 'yes' ? (same ? ' · свой квадрат · ' + pts + ' очков' : ' · ' + r.km + ' км · ' + pts + ' очков') : '') + '</p><p>' + (r.pair === 'yes' ? 'Обе точки есть, это одна связь' : 'Ждёт точку второй стороны') + '</p></div>';
+  }).join('');
+}
+loadCheck();
+setInterval(loadCheck, 15000);
+</script>
+</body>
+</html>
