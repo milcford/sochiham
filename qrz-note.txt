@@ -1,0 +1,1 @@
+async function lookup(){const call=document.getElementById('edit').callsign.value; const err=document.getElementById('qrz-err'); err.textContent=''; try { const res=await fetch('/api/qrz?call='+encodeURIComponent(call)); const p=await res.json(); if(!res.ok){ err.textContent=p.error||'Не нашлось'; return;} fill(p);} catch(e){ err.textContent='Нет ответа от qrz.ru'; }}
