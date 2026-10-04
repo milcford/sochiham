@@ -10,11 +10,12 @@
   .card { background:#fff; border-radius:16px; padding:16px; margin:10px 0; }
   label { display:block; margin-top:10px; font-weight:700; }
   input, select { width:100%; padding:12px; margin:6px 0; font-size:16px; border-radius:12px; border:1px solid #e7e5e4; box-sizing:border-box; }
+  .check { display:flex; gap:10px; align-items:center; font-weight:700; margin:12px 0; }
+  .check input { width:auto; }
   button { width:100%; background:#e85d04; color:#fff; border:0; border-radius:14px; padding:14px; font-size:18px; font-weight:700; margin-top:12px; }
   .live { background:#1b7a3a; color:#fff; border-radius:16px; padding:16px; }
   .live strong { font-size:32px; display:block; }
   a { color:#e85d04; }
-  .note { color:#57534e; }
 </style>
 </head>
 <body>
@@ -30,35 +31,22 @@
     <datalist id="calls"></datalist>
     <label>Километры связи</label>
     <input id="km" type="number" min="0" step="1" placeholder="Сколько км" required>
-    <p class="note">Локатор километры не даёт. Расстояние вводите сами, как в отчёте. Локатор нужен только чтобы понять, свой это малый квадрат или нет.</p>
-    <label>Ваш локатор</label>
-    <input id="my-loc" placeholder="KN93">
-    <label>Локатор корреспондента</label>
-    <input id="dx-loc" placeholder="KN94">
     <label>Диапазон</label>
     <select id="band">
       <option value="144">144 МГц, 1 очко за км</option>
       <option value="430">430 МГц, 2 очка за км</option>
       <option value="1200">1,2 ГГц, 3 очка за км</option>
     </select>
+    <label class="check"><input id="same" type="checkbox"> Свой малый квадрат</label>
     <button>Посчитать связь</button>
   </form>
   <div class="live"><small>Сумма</small><strong id="total">0</strong> очков</div>
   <div id="qso-list"></div>
 </main>
 <script>
-const people = [];
-function fillLoc(callId, locId) {
-  const call = document.getElementById(callId).value.trim().toUpperCase();
-  const found = people.find(p => p.callsign === call);
-  if (found && found.locator) document.getElementById(locId).value = found.locator;
-}
 fetch('http://' + location.hostname + ':8081/api/calls').then(r => r.json()).then(list => {
-  people.push(...list);
   document.getElementById('calls').innerHTML = list.map(p => '<option value="' + p.callsign + '">' + p.callsign + ' ' + (p.name || '') + '</option>').join('');
 }).catch(() => {});
-document.getElementById('my-call').addEventListener('change', () => fillLoc('my-call', 'my-loc'));
-document.getElementById('dx-call').addEventListener('change', () => fillLoc('dx-call', 'dx-loc'));
 const rates = { "144": [1, 2], "430": [2, 2], "1200": [3, 3] };
 const seen = new Set();
 let total = 0;
@@ -68,13 +56,10 @@ function addQso(e) {
   const call = document.getElementById("dx-call").value.trim().toUpperCase();
   const km = Number(document.getElementById("km").value);
   const band = document.getElementById("band").value;
-  const myLoc = document.getElementById("my-loc").value.trim().toUpperCase();
-  const dxLoc = document.getElementById("dx-loc").value.trim().toUpperCase();
-  if (!km && km !== 0) { alert("Введите километры"); return; }
+  const same = document.getElementById("same").checked;
   const key = myCall + "|" + call + "|" + band;
   if (seen.has(key)) { alert("Повтор на этом диапазоне не засчитывается"); return; }
   seen.add(key);
-  const same = myLoc.length >= 4 && dxLoc.length >= 4 && myLoc.slice(0, 4) === dxLoc.slice(0, 4);
   const pts = same ? rates[band][1] : Math.round(km * rates[band][0]);
   total += pts;
   document.getElementById("total").textContent = total;
@@ -83,8 +68,8 @@ function addQso(e) {
   row.innerHTML = "<b>" + myCall + " — " + call + " · " + band + "</b><p>" + (same ? "свой малый квадрат" : km + " км") + " · " + pts + " очков</p>";
   document.getElementById("qso-list").prepend(row);
   document.getElementById("dx-call").value = "";
-  document.getElementById("dx-loc").value = "";
   document.getElementById("km").value = "";
+  document.getElementById("same").checked = false;
 }
 </script>
 </body>
