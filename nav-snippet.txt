@@ -1,0 +1,2 @@
+  nav a { border:1px solid #e7e5e4; background:#fff; border-radius:999px; padding:8px 12px; font-weight:600; color:var(--ink); text-decoration:none; }
+  nav a.on { background:var(--orange); color:#fff; border-color:var(--orange); }
