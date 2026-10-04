@@ -39,17 +39,23 @@ def tag_text(root, name):
     for el in root.iter():
         if el.tag.split("}")[-1] == name and el.text: return el.text.strip()
     return ""
+def qrz_login():
+    global QRZ_SESSION
+    login = qrz_xml("https://api.qrz.ru/login?" + urlencode({"u": QRZ_USER, "p": QRZ_PASSWORD, "agent": "sochiham"}))
+    QRZ_SESSION = tag_text(login, "session_id")
+    if not QRZ_SESSION: raise RuntimeError(tag_text(login, "error") or "qrz.ru не пустил")
 def qrz_lookup(call):
     global QRZ_SESSION
     if not QRZ_USER or not QRZ_PASSWORD: raise RuntimeError("не заданы QRZ_USER и QRZ_PASSWORD")
-    if not QRZ_SESSION:
-        login = qrz_xml("https://api.qrz.ru/login?" + urlencode({"u": QRZ_USER, "p": QRZ_PASSWORD, "agent": "sochiham"}))
-        QRZ_SESSION = tag_text(login, "session_id")
-        if not QRZ_SESSION: raise RuntimeError(tag_text(login, "error") or "qrz.ru не пустил")
+    if not QRZ_SESSION: qrz_login()
     data = qrz_xml("https://api.qrz.ru/callsign?" + urlencode({"id": QRZ_SESSION, "callsign": call}))
     if tag_text(data, "error"):
         QRZ_SESSION = ""
-        raise RuntimeError(tag_text(data, "error"))
+        qrz_login()
+        data = qrz_xml("https://api.qrz.ru/callsign?" + urlencode({"id": QRZ_SESSION, "callsign": call}))
+        if tag_text(data, "error"):
+            QRZ_SESSION = ""
+            raise RuntimeError(tag_text(data, "error"))
     grid = tag_text(data, "locator") or tag_text(data, "grid")
     phone = tag_text(data, "phone") or tag_text(data, "tel") or tag_text(data, "telephone")
     return {"callsign": tag_text(data, "call") or call, "surname": tag_text(data, "surname"), "name": tag_text(data, "name"), "patronymic": tag_text(data, "name2"), "city": tag_text(data, "city").rstrip(","), "locator": grid[:4].upper(), "phone": phone}
@@ -69,7 +75,7 @@ async function loadLocators(){const list=await api('/api/locators'); const sel=d
 login.onsubmit=async(e)=>{e.preventDefault(); const res=await fetch('/login',{method:'POST', body:new URLSearchParams(new FormData(login))}); if(!res.ok){document.getElementById('login-err').textContent='Неверный пароль'; return;} login.hidden=true; app.hidden=false; await loadLocators(); load();};
 async function load(){const people=await api('/api/operators'); document.getElementById('cards').innerHTML=people.map(p=>'<div class=card><b>'+p.callsign+'</b><div>'+(p.surname||'')+' '+p.name+' '+(p.patronymic||'')+'</div><div>'+(p.city||'')+' '+(p.locator||'')+'</div><div>'+(p.phone||'')+'</div><div class=actions><button type=button onclick=\'fill('+JSON.stringify(p)+')\'>Исправить</button><button class=ghost type=button onclick=del('+p.id+')>Удалить</button></div></div>').join('');}
 function fill(p){const f=document.getElementById('edit'); for (const k of ['id','callsign','surname','name','patronymic','city','locator']) f[k].value=p[k]||''; const digits=(p.phone||'').replace(/\D/g,''); const code=['+375','+374','+995','+380','+7'].find(c=>digits.startsWith(c.slice(1)))||'+7'; document.getElementById('code').value=code; document.getElementById('number').value=mask(digits.slice(code.length-1)); window.scrollTo(0,0);}
-async function lookup(){document.getElementById('qrz-err').textContent=''; try { fill(await api('/api/qrz?call='+encodeURIComponent(document.getElementById('edit').callsign.value)));} catch(e){ document.getElementById('qrz-err').textContent='Не нашлось'; }}
+async function lookup(){document.getElementById('qrz-err').textContent=''; const res=await fetch('/api/qrz?call='+encodeURIComponent(document.getElementById('edit').callsign.value)); const data=await res.json(); if(!res.ok){document.getElementById('qrz-err').textContent=data.error||'Не нашлось'; return;} fill(data);}
 document.getElementById('edit').onsubmit=async(e)=>{e.preventDefault(); const digits=document.getElementById('number').value.replace(/\D/g,''); e.target.phone.value=digits?document.getElementById('code').value+' '+document.getElementById('number').value:''; await api('/api/operators',{method:'POST', body:new URLSearchParams(new FormData(e.target))}); e.target.reset(); document.getElementById('number').value=''; load();};
 async function del(id){if(!confirm('Удалить?')) return; await api('/api/operators?id='+id,{method:'DELETE'}); load();}
 </script></body></html>'''
