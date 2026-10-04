@@ -51,7 +51,7 @@
 <script>
 const api = 'http://' + location.hostname + ':8081';
 const map = L.map('map', { attributionControl: false }).setView([43.60, 39.73], 11);
-L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', { maxZoom: 18 }).addTo(map);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18 }).addTo(map);
 let marker, point;
 map.on('click', e => {
   point = e.latlng;
