@@ -25,17 +25,23 @@ def tag_text(root, name):
     for el in root.iter():
         if el.tag.split("}")[-1] == name and el.text: return el.text.strip()
     return ""
+def qrz_login():
+    global QRZ_SESSION
+    login = ET.fromstring(urlopen("https://api.qrz.ru/login?" + urlencode({"u": QRZ_USER, "p": QRZ_PASSWORD, "agent": "sochiham"}), timeout=20).read())
+    QRZ_SESSION = tag_text(login, "session_id")
+    if not QRZ_SESSION: raise RuntimeError(tag_text(login, "error") or "qrz.ru не пустил")
 def qrz_lookup(call):
     global QRZ_SESSION
     if not QRZ_USER or not QRZ_PASSWORD: raise RuntimeError("нет доступа к qrz")
-    if not QRZ_SESSION:
-        login = ET.fromstring(urlopen("https://api.qrz.ru/login?" + urlencode({"u": QRZ_USER, "p": QRZ_PASSWORD, "agent": "sochiham"}), timeout=20).read())
-        QRZ_SESSION = tag_text(login, "session_id")
-        if not QRZ_SESSION: raise RuntimeError(tag_text(login, "error") or "qrz.ru не пустил")
+    if not QRZ_SESSION: qrz_login()
     data = ET.fromstring(urlopen("https://api.qrz.ru/callsign?" + urlencode({"id": QRZ_SESSION, "callsign": call}), timeout=20).read())
     if tag_text(data, "error"):
         QRZ_SESSION = ""
-        raise RuntimeError(tag_text(data, "error"))
+        qrz_login()
+        data = ET.fromstring(urlopen("https://api.qrz.ru/callsign?" + urlencode({"id": QRZ_SESSION, "callsign": call}), timeout=20).read())
+        if tag_text(data, "error"):
+            QRZ_SESSION = ""
+            raise RuntimeError(tag_text(data, "error"))
     grid = tag_text(data, "locator") or tag_text(data, "grid")
     phone = tag_text(data, "phone") or tag_text(data, "tel") or tag_text(data, "telephone")
     return {"callsign": tag_text(data, "call") or call, "surname": tag_text(data, "surname"), "name": tag_text(data, "name"), "patronymic": tag_text(data, "name2"), "city": tag_text(data, "city").rstrip(","), "locator": grid[:4].upper(), "phone": phone}
