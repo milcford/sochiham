@@ -1,0 +1,4 @@
+def tag_text(root, name):
+    for el in root.iter():
+        if el.tag.split('}')[-1] == name and el.text: return el.text.strip()
+    return ""
