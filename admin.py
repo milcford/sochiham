@@ -82,8 +82,8 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers(); self.wfile.write(data)
     def do_GET(self):
         if self.path.startswith("/api/qso"):
-            rows = psql("SELECT my_call, dx_call, band, to_char(worked_at, 'DD.MM HH24:MI'), km, points, CASE WHEN EXISTS (SELECT 1 FROM contest_logs b WHERE b.my_call=a.dx_call AND b.dx_call=a.my_call AND b.band=a.band AND abs(extract(epoch FROM (b.worked_at-a.worked_at)))<=900) THEN 'yes' ELSE 'no' END FROM contest_logs a ORDER BY worked_at DESC;")
-            items = [dict(zip(["my_call","dx_call","band","worked_at","km","points","pair"], line.split("|"))) for line in rows.splitlines() if line.strip()]
+            rows = psql("SELECT a.my_call, a.dx_call, a.band, to_char(a.worked_at, 'DD.MM HH24:MI'), COALESCE(round(2*6371*asin(sqrt(power(sin(radians(b.my_lat-a.my_lat)/2),2)+cos(radians(a.my_lat))*cos(radians(b.my_lat))*power(sin(radians(b.my_lon-a.my_lon)/2),2))))::text,''), CASE WHEN b.id IS NOT NULL THEN 'yes' ELSE 'no' END FROM contest_logs a LEFT JOIN LATERAL (SELECT * FROM contest_logs b WHERE b.my_call=a.dx_call AND b.dx_call=a.my_call AND b.band=a.band AND b.my_lat IS NOT NULL AND abs(extract(epoch FROM (b.worked_at-a.worked_at)))<=900 ORDER BY abs(extract(epoch FROM (b.worked_at-a.worked_at))) LIMIT 1) b ON true ORDER BY a.worked_at DESC;")
+            items = [dict(zip(["my_call","dx_call","band","worked_at","km","pair"], line.split("|"))) for line in rows.splitlines() if line.strip()]
             return open_json(self, items)
         if self.path.startswith("/api/calls"):
             rows = psql("SELECT callsign, COALESCE(name,''), COALESCE(locator,'') FROM operators ORDER BY callsign;")
@@ -110,11 +110,11 @@ class Handler(BaseHTTPRequestHandler):
             my_call = form.get("my_call", "").strip().upper()
             dx_call = form.get("dx_call", "").strip().upper()
             when = form.get("when", "").replace("T", " ")
-            km = int(form.get("km", "0") or 0)
-            points = int(form.get("points", "0") or 0)
             band = form.get("band", "")
-            if not my_call or not dx_call or not when: return open_json(self, {"error": "не заполнено"}, 400)
-            psql(f"INSERT INTO contest_logs (my_call, dx_call, band, km, points, worked_at) VALUES ({q(my_call)}, {q(dx_call)}, {q(band)}, {km}, {points}, {q(when)}) ON CONFLICT DO NOTHING;")
+            lat = float(form.get("lat", "0") or 0)
+            lon = float(form.get("lon", "0") or 0)
+            if not my_call or not dx_call or not when or not lat: return open_json(self, {"error": "не заполнено"}, 400)
+            psql(f"INSERT INTO contest_logs (my_call, dx_call, band, km, points, worked_at, my_lat, my_lon) VALUES ({q(my_call)}, {q(dx_call)}, {q(band)}, 0, 0, {q(when)}, {lat}, {lon}) ON CONFLICT DO NOTHING;")
             return open_json(self, {"ok": True})
         if self.path == "/login":
             if not PASSWORD or not same_password(form.get("password", "")): return self.send(403, "no")
