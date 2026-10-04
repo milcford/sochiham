@@ -48,19 +48,17 @@
     <button data-tab="ads">Объявления</button>
     <a href="kubok.html">Кубок</a>
     <a href="lyudi.html">Добавить себя</a>
+    <a href="vedushchiy.html">Ведущему</a>
   </nav>
 </header>
 <main>
   <section id="home">
     <div class="card when"><div><h1>Воскресенье, 9:00</h1><p class="mhz">145.525 МГц</p></div><div style="font-size:42px">📻</div></div>
-    <div class="live"><small>Сейчас говорит</small><strong id="now-call">RA6XXX</strong><em id="now-name">Иван</em></div>
+    <div class="live"><small>Сейчас говорит</small><strong id="now-call">Никто</strong><em id="now-name"></em><div id="host"></div></div>
     <div class="card">
       <b>Очередь</b>
-      <div class="row"><span>следующий</span><b>RW6YYY Пётр</b></div>
-      <div class="row"><span>дальше</span><b>UA6ZZZ Сергей</b></div>
-      <button class="big" onclick="checkIn()">Я на частоте</button>
-      <p id="checked" style="color:#78716c"></p>
-      <button class="big ghost" onclick="passWord()">Передать слово</button>
+      <div id="queue"><div class="row"><span>пока пусто</span></div></div>
+      <a class="big ghost" href="vedushchiy.html">Войти ведущему</a>
     </div>
     <div class="card">
       <b>Кубок и люди</b>
@@ -96,14 +94,18 @@
 </main>
 <footer>Пробная страница клуба. Домен пока не нужен.</footer>
 <script>
-const queue=[{call:"RA6XXX",name:"Иван"},{call:"RW6YYY",name:"Пётр"},{call:"UA6ZZZ",name:"Сергей"}];
-let i=0;
-function show(){document.getElementById("now-call").textContent=queue[i].call;document.getElementById("now-name").textContent=queue[i].name;}
-function passWord(){i=(i+1)%queue.length;show();}
-function checkIn(){const call=prompt("Ваш позывной"); if(!call)return; document.getElementById("checked").textContent=call.toUpperCase()+" отметился на частоте";}
 document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{document.querySelectorAll("nav button").forEach(x=>x.classList.remove("on")); b.classList.add("on"); ["home","photo","video","ads"].forEach(id=>document.getElementById(id).classList.toggle("hide", id!==b.dataset.tab));});
 function addAd(e){e.preventDefault(); const el=document.createElement("div"); el.className="card"; el.innerHTML="<b>"+document.getElementById("kind").value+" "+document.getElementById("what").value+"</b><p>"+(document.getElementById("where").value||"без района")+"</p>"; document.getElementById("adlist").prepend(el); e.target.reset();}
-show();
+async function round(){
+  try {
+    const data=await fetch('/api/round').then(r=>r.json());
+    document.getElementById('now-call').textContent=data.current_call||'Никто';
+    document.getElementById('now-name').textContent=data.current_name||'';
+    document.getElementById('host').textContent=data.host?('Ведёт '+data.host):'Ведущий ещё не назначен';
+    document.getElementById('queue').innerHTML=(data.queue||[]).map((p,i)=>'<div class="row"><span>'+(i+1)+'</span><b>'+p.callsign+' '+(p.name||'')+'</b></div>').join('')||'<div class="row"><span>пока пусто</span></div>';
+  } catch(e) {}
+}
+round(); setInterval(round, 5000);
 </script>
 </body>
 </html>
