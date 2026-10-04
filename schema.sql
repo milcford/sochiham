@@ -1,15 +1,14 @@
--- База портала радиолюбителей. Первый каркас, таблицы можно добавлять.
--- Создание: sudo -u postgres createdb sochiham
--- Накат: psql -d sochiham -f schema.sql
+-- База портала радиолюбителей.
 
 CREATE TABLE operators (
   id            bigserial PRIMARY KEY,
   callsign      text NOT NULL UNIQUE,
+  surname       text,
   name          text NOT NULL,
+  patronymic    text,
   city          text,
   locator       text,
   phone         text,
-  messenger     text,
   about         text,
   is_host       boolean NOT NULL DEFAULT false,
   created_at    timestamptz NOT NULL DEFAULT now()
