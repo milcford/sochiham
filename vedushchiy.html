@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ведущий круглого стола</title>
+<style>
+  body { font-family: system-ui, sans-serif; background:#faf7f4; margin:0; color:#1c1917; }
+  main { max-width:720px; margin:0 auto; padding:16px; }
+  form, .card, .live { background:#fff; border-radius:16px; padding:16px; margin:12px 0; }
+  .live { background:#1b7a3a; color:#fff; }
+  .live strong { display:block; font-size:32px; }
+  input { display:block; width:100%; box-sizing:border-box; padding:14px; margin:8px 0; font-size:18px; border:1px solid #e7e5e4; border-radius:12px; }
+  button { display:block; width:100%; background:#e85d04; color:#fff; border:0; border-radius:12px; padding:14px; font-size:18px; font-weight:700; margin-top:10px; }
+  button.ghost { background:#fff; color:#9a3412; border:1px solid #e85d04; }
+  .row { display:flex; justify-content:space-between; gap:8px; align-items:center; padding:10px 0; border-bottom:1px solid #f5f5f4; }
+  a { color:#e85d04; }
+  .err { color:#b91c1c; }
+</style>
+</head>
+<body>
+<main>
+  <p><a href="index.html">На портал</a></p>
+  <h1>Ведущий</h1>
+  <form id="login">
+    <input name="callsign" placeholder="Ваш позывной" required>
+    <input name="password" type="password" placeholder="Пароль ведущего" required>
+    <button>Войти</button>
+    <p class="err" id="err"></p>
+  </form>
+  <div id="app" hidden>
+    <div class="live"><small>Сейчас говорит</small><strong id="now">Никто</strong></div>
+    <form id="add">
+      <input id="call" list="calls" placeholder="Позывной в очередь" required>
+      <datalist id="calls"></datalist>
+      <button>В очередь</button>
+    </form>
+    <div class="card" id="queue"></div>
+    <button onclick="nextWord()">Передать слово следующему</button>
+  </div>
+</main>
+<script>
+const login=document.getElementById('login'), app=document.getElementById('app');
+async function api(url, opts){const res=await fetch(url, opts); if(res.status==401){app.hidden=true; login.hidden=false; throw new Error('auth');} return res.json();}
+login.onsubmit=async(e)=>{e.preventDefault(); const res=await fetch('/api/round/login',{method:'POST', body:new URLSearchParams(new FormData(login))}); if(!res.ok){document.getElementById('err').textContent='Вас не назначили ведущим или неверный пароль'; return;} login.hidden=true; app.hidden=false; const list=await api('/api/calls'); document.getElementById('calls').innerHTML=list.map(p=>'<option value="'+p.callsign+'">'+p.callsign+' '+(p.name||'')+'</option>').join(''); load();};
+document.getElementById('add').onsubmit=async(e)=>{e.preventDefault(); await api('/api/round/add',{method:'POST', body:new URLSearchParams({callsign:document.getElementById('call').value})}); e.target.reset(); load();};
+async function nextWord(){await api('/api/round/next',{method:'POST'}); load();}
+async function drop(id){await api('/api/round/remove?id='+id,{method:'DELETE'}); load();}
+async function load(){const data=await api('/api/round'); document.getElementById('now').textContent=(data.current_call||'Никто')+' '+(data.current_name||''); document.getElementById('queue').innerHTML=(data.queue||[]).map((p,i)=>'<div class=row><span>'+(i+1)+'. <b>'+p.callsign+'</b> '+(p.name||'')+'</span><button class=ghost type=button onclick=drop('+p.id+')>Убрать</button></div>').join('')||'<p>Очередь пустая</p>';}
+</script>
+</body>
+</html>
