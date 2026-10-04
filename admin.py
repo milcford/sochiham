@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
-import hashlib, hmac, json, os, secrets, subprocess
+import hashlib, hmac, json, os, secrets, subprocess, xml.etree.ElementTree as ET
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import parse_qs
+from urllib.parse import parse_qs, urlencode
+from urllib.request import urlopen
 HOST = os.environ.get("ADMIN_HOST", "127.0.0.1")
 PORT = int(os.environ.get("ADMIN_PORT", "8081"))
 PASSWORD = os.environ.get("ADMIN_PASSWORD", "")
 DB = os.environ.get("PGDATABASE", "sochiham")
 DB_USER = os.environ.get("PGUSER", "sochiham")
 DB_PASSWORD = os.environ.get("PGPASSWORD", "")
+QRZ_USER = os.environ.get("QRZ_USER", "")
+QRZ_PASSWORD = os.environ.get("QRZ_PASSWORD", "")
 SECRET = os.environ.get("ADMIN_SECRET", secrets.token_hex(16))
+QRZ_SESSION = ""
 
 def token():
     return hmac.new(SECRET.encode(), b"admin-ok", hashlib.sha256).hexdigest()
@@ -28,11 +32,44 @@ def psql(sql):
 def q(value):
     return "'" + str(value).replace("'", "''") + "'"
 
+def qrz_xml(url):
+    with urlopen(url, timeout=20) as resp:
+        raw = resp.read()
+    return ET.fromstring(raw)
+
+def tag_text(root, name):
+    for el in root.iter():
+        if el.tag.endswith(name) and el.text:
+            return el.text.strip()
+    return ""
+
+def qrz_lookup(call):
+    global QRZ_SESSION
+    if not QRZ_USER or not QRZ_PASSWORD:
+        raise RuntimeError("не заданы QRZ_USER и QRZ_PASSWORD")
+    if not QRZ_SESSION:
+        login = qrz_xml("https://api.qrz.ru/login?" + urlencode({"u": QRZ_USER, "p": QRZ_PASSWORD, "agent": "sochiham"}))
+        QRZ_SESSION = tag_text(login, "session_id")
+        if not QRZ_SESSION:
+            raise RuntimeError(tag_text(login, "error") or "qrz.ru не пустил")
+    data = qrz_xml("https://api.qrz.ru/callsign?" + urlencode({"id": QRZ_SESSION, "callsign": call}))
+    if tag_text(data, "error"):
+        QRZ_SESSION = ""
+        raise RuntimeError(tag_text(data, "error"))
+    return {
+        "callsign": tag_text(data, "call") or call,
+        "surname": tag_text(data, "surname"),
+        "name": tag_text(data, "name"),
+        "patronymic": tag_text(data, "name2"),
+        "city": tag_text(data, "city").rstrip(","),
+        "locator": tag_text(data, "locator") or tag_text(data, "grid"),
+    }
+
 PAGE = """<!DOCTYPE html><html lang=ru><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>Люди</title>
-<style>body{font-family:system-ui,sans-serif;background:#faf7f4;margin:0;color:#1c1917}main{max-width:880px;margin:0 auto;padding:16px}form{background:#fff;border-radius:16px;padding:16px;margin:12px 0}input{width:100%;padding:12px;margin:6px 0;font-size:16px;border:1px solid #e7e5e4;border-radius:12px}button{background:#e85d04;color:#fff;border:0;border-radius:12px;padding:12px 16px;font-weight:700}button.ghost{background:#fff;color:#b91c1c;border:1px solid #b91c1c}table{width:100%;border-collapse:collapse;background:#fff}td,th{text-align:left;padding:10px;border-bottom:1px solid #f5f5f4}.err{color:#b91c1c}</style></head>
+<style>body{font-family:system-ui,sans-serif;background:#faf7f4;margin:0;color:#1c1917}main{max-width:880px;margin:0 auto;padding:16px}form{background:#fff;border-radius:16px;padding:16px;margin:12px 0}input{width:100%;padding:12px;margin:6px 0;font-size:16px;border:1px solid #e7e5e4;border-radius:12px}button{background:#e85d04;color:#fff;border:0;border-radius:12px;padding:12px 16px;font-weight:700}button.ghost{background:#fff;color:#9a3412;border:1px solid #e85d04}table{width:100%;border-collapse:collapse;background:#fff}td,th{text-align:left;padding:10px;border-bottom:1px solid #f5f5f4}.err{color:#b91c1c}</style></head>
 <body><main><h1>Радиолюбители</h1>
 <form id=login><input name=password type=password placeholder="Пароль админки" required><button>Войти</button><p class=err id=login-err></p></form>
-<div id=app hidden><form id=edit><input name=id type=hidden><input name=callsign placeholder=Позывной required><input name=surname placeholder=Фамилия><input name=name placeholder=Имя required><input name=patronymic placeholder="Отчество, если есть"><input name=city placeholder=Город><input name=locator placeholder=Локатор><input name=phone placeholder=Телефон><button>Сохранить</button></form>
+<div id=app hidden><form id=edit><input name=id type=hidden><input name=callsign placeholder=Позывной required><button class=ghost type=button onclick=lookup()>Найти на qrz.ru</button><p class=err id=qrz-err></p><input name=surname placeholder=Фамилия><input name=name placeholder=Имя required><input name=patronymic placeholder="Отчество, если есть"><input name=city placeholder=Город><input name=locator placeholder=Локатор><input name=phone placeholder=Телефон><button>Сохранить</button></form>
 <table><thead><tr><th>Позывной</th><th>Фамилия</th><th>Имя</th><th>Отчество</th><th>Город</th><th></th></tr></thead><tbody id=rows></tbody></table></div></main>
 <script>
 const login=document.getElementById('login'), app=document.getElementById('app');
@@ -40,6 +77,7 @@ async function api(url, opts){const res=await fetch(url, opts); if(res.status==4
 login.onsubmit=async(e)=>{e.preventDefault(); const res=await fetch('/login',{method:'POST', body:new URLSearchParams(new FormData(login))}); if(!res.ok){document.getElementById('login-err').textContent='Неверный пароль'; return;} login.hidden=true; app.hidden=false; load();};
 async function load(){const people=await api('/api/operators'); document.getElementById('rows').innerHTML=people.map(p=>`<tr><td>${p.callsign}</td><td>${p.surname||''}</td><td>${p.name}</td><td>${p.patronymic||''}</td><td>${p.city||''}</td><td><button type=button onclick='fill(${JSON.stringify(p)})'>Исправить</button> <button class=ghost type=button onclick=del(${p.id})>Удалить</button></td></tr>`).join('');}
 function fill(p){const f=document.getElementById('edit'); for (const k of ['id','callsign','surname','name','patronymic','city','locator','phone']) f[k].value=p[k]||'';}
+async function lookup(){const call=document.getElementById('edit').callsign.value; document.getElementById('qrz-err').textContent=''; try { const p=await api('/api/qrz?call='+encodeURIComponent(call)); fill(p);} catch(e){ document.getElementById('qrz-err').textContent='Не нашлось'; }}
 document.getElementById('edit').onsubmit=async(e)=>{e.preventDefault(); await api('/api/operators',{method:'POST', body:new URLSearchParams(new FormData(e.target))}); e.target.reset(); load();};
 async function del(id){if(!confirm('Удалить?')) return; await api('/api/operators?id='+id,{method:'DELETE'}); load();}
 </script></body></html>"""
@@ -57,6 +95,15 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
     def do_GET(self):
+        if self.path.startswith("/api/qrz"):
+            if not self.cookie_ok():
+                return self.send(401, '{"error":"auth"}', "application/json")
+            call = parse_qs(self.path.split("?", 1)[-1]).get("call", [""])[0].strip().upper()
+            try:
+                found = qrz_lookup(call)
+            except Exception as exc:
+                return self.send(404, json.dumps({"error": str(exc)}, ensure_ascii=False), "application/json")
+            return self.send(200, json.dumps(found, ensure_ascii=False), "application/json")
         if self.path.startswith("/api/operators"):
             if not self.cookie_ok():
                 return self.send(401, '{"error":"auth"}', "application/json")
