@@ -13,6 +13,9 @@ SECRET = os.environ.get("ADMIN_SECRET", secrets.token_hex(16))
 def token():
     return hmac.new(SECRET.encode(), b"admin-ok", hashlib.sha256).hexdigest()
 
+def same_password(given):
+    return hmac.compare_digest(given.encode(), PASSWORD.encode())
+
 def psql(sql):
     env = os.environ.copy()
     if DB_PASSWORD:
@@ -73,7 +76,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         form = self.read_form()
         if self.path == "/login":
-            if not PASSWORD or not hmac.compare_digest(form.get("password", ""), PASSWORD):
+            if not PASSWORD or not same_password(form.get("password", "")):
                 return self.send(403, "no")
             return self.send(200, "ok", extra=f"admin={token()}; HttpOnly; Path=/")
         if not self.cookie_ok():
