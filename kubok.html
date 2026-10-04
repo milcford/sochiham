@@ -27,8 +27,6 @@
   <p><a href="index.html">На портал</a></p>
   <h1>Кубок Сочи, УКВ</h1>
   <p>Точка на карте сама даёт локатор. Километры считаются по прямой. Если оба в одном малом квадрате, очки фиксированные: 2, 2 и 3.</p>
-  <h2>У кого сколько очков</h2>
-  <table><thead><tr><th>Место</th><th>Позывной</th><th>Очки</th></tr></thead><tbody id="score"></tbody></table>
   <form class="card" onsubmit="addQso(event)">
     <label>Ваш позывной</label>
     <input id="my-call" list="calls" required autocomplete="off">
@@ -50,6 +48,8 @@
   </form>
   <h2>Записи</h2>
   <div id="qso-list"></div>
+  <h2>У кого сколько очков</h2>
+  <table><thead><tr><th>Место</th><th>Позывной</th><th>Очки</th></tr></thead><tbody id="score"></tbody></table>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
