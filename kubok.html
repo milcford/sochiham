@@ -4,12 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Кубок Сочи УКВ — подсчёт</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
   body { font-family: system-ui, sans-serif; background:#faf7f4; margin:0; color:#1c1917; }
   main { max-width:720px; margin:0 auto; padding:16px; }
   .card { background:#fff; border-radius:16px; padding:16px; margin:10px 0; }
   label { display:block; margin-top:10px; font-weight:700; }
   input, select { width:100%; padding:12px; margin:6px 0; font-size:16px; border-radius:12px; border:1px solid #e7e5e4; box-sizing:border-box; }
+  #map { height:360px; border-radius:16px; margin-top:8px; }
   button { width:100%; background:#e85d04; color:#fff; border:0; border-radius:14px; padding:14px; font-size:18px; font-weight:700; margin-top:12px; }
   button.ghost { background:#fff; color:#9a3412; border:1px solid #e85d04; }
   .ok { border-left:6px solid #1b7a3a; }
@@ -21,7 +23,7 @@
 <main>
   <p><a href="index.html">На портал</a></p>
   <h1>Кубок Сочи, УКВ</h1>
-  <p>18 октября 2026. Очки — за километры: 144 МГц — 1, 430 МГц — 2, 1,2 ГГц — 3. Каждый пишет связь со своей стороны. Сверка соединяет пару, чтобы одна связь не считалась дважды.</p>
+  <p>Каждый ставит на карте точку, откуда работал. Когда второй сделает то же, километры по прямой посчитаются сами. 144 МГц — 1 очко за км, 430 МГц — 2, 1,2 ГГц — 3.</p>
   <form class="card" onsubmit="addQso(event)">
     <label>Ваш позывной</label>
     <input id="my-call" list="calls" required autocomplete="off">
@@ -30,21 +32,31 @@
     <datalist id="calls"></datalist>
     <label>Время связи</label>
     <input id="when" type="datetime-local" required>
-    <label>Километры связи</label>
-    <input id="km" type="number" min="0" step="1" required>
     <label>Диапазон</label>
     <select id="band">
       <option value="144">144 МГц, 1 очко за км</option>
       <option value="430">430 МГц, 2 очка за км</option>
       <option value="1200">1,2 ГГц, 3 очка за км</option>
     </select>
+    <label>Откуда работали. Нажмите на карту</label>
+    <div id="map"></div>
+    <p id="place">Точка ещё не выбрана</p>
     <button>Сохранить связь</button>
   </form>
   <button class="ghost" type="button" onclick="loadCheck()">Сверить записи</button>
   <div id="qso-list"></div>
 </main>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 const api = 'http://' + location.hostname + ':8081';
+const map = L.map('map').setView([43.60, 39.73], 11);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18 }).addTo(map);
+let marker, point;
+map.on('click', e => {
+  point = e.latlng;
+  if (marker) marker.setLatLng(point); else marker = L.marker(point).addTo(map);
+  document.getElementById('place').textContent = point.lat.toFixed(5) + ', ' + point.lng.toFixed(5);
+});
 const now = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16);
 document.getElementById('when').value = now;
 fetch(api + '/api/calls').then(r => r.json()).then(list => {
@@ -53,23 +65,25 @@ fetch(api + '/api/calls').then(r => r.json()).then(list => {
 const rates = { "144": 1, "430": 2, "1200": 3 };
 async function addQso(e) {
   e.preventDefault();
+  if (!point) { alert('Нажмите на карту, откуда работали'); return; }
   const body = new URLSearchParams({
     my_call: document.getElementById('my-call').value.trim().toUpperCase(),
     dx_call: document.getElementById('dx-call').value.trim().toUpperCase(),
     when: document.getElementById('when').value,
-    km: document.getElementById('km').value,
     band: document.getElementById('band').value,
-    points: String(Math.round(Number(document.getElementById('km').value) * rates[document.getElementById('band').value]))
+    lat: String(point.lat), lon: String(point.lng)
   });
   const res = await fetch(api + '/api/qso', { method: 'POST', body });
   if (!res.ok) { alert('Не сохранилось. Проверьте, что админка запущена.'); return; }
   document.getElementById('dx-call').value = '';
-  document.getElementById('km').value = '';
   loadCheck();
 }
 async function loadCheck() {
   const rows = await fetch(api + '/api/qso').then(r => r.json());
-  document.getElementById('qso-list').innerHTML = rows.map(r => '<div class="card ' + (r.pair === 'yes' ? 'ok' : 'wait') + '"><b>' + r.my_call + ' — ' + r.dx_call + ' · ' + r.band + '</b><p>' + r.worked_at + ' · ' + r.km + ' км · ' + r.points + ' очков</p><p>' + (r.pair === 'yes' ? 'Есть запись с обеих сторон, это одна связь' : 'Ждёт подтверждения от второй стороны') + '</p></div>').join('');
+  document.getElementById('qso-list').innerHTML = rows.map(r => {
+    const pts = r.km ? Math.round(Number(r.km) * rates[r.band] || 0) : '';
+    return '<div class="card ' + (r.pair === 'yes' ? 'ok' : 'wait') + '"><b>' + r.my_call + ' — ' + r.dx_call + ' · ' + r.band + '</b><p>' + r.worked_at + (r.km ? ' · ' + r.km + ' км · ' + pts + ' очков' : '') + '</p><p>' + (r.pair === 'yes' ? 'Обе точки есть, это одна связь' : 'Ждёт точку второй стороны') + '</p></div>';
+  }).join('');
 }
 loadCheck();
 </script>
