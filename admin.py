@@ -37,7 +37,7 @@ def qrz_xml(url):
     with urlopen(url, timeout=20) as resp: return ET.fromstring(resp.read())
 def tag_text(root, name):
     for el in root.iter():
-        if el.tag.endswith(name) and el.text: return el.text.strip()
+        if el.tag.split("}")[-1] == name and el.text: return el.text.strip()
     return ""
 def qrz_lookup(call):
     global QRZ_SESSION
@@ -50,7 +50,8 @@ def qrz_lookup(call):
     if tag_text(data, "error"):
         QRZ_SESSION = ""
         raise RuntimeError(tag_text(data, "error"))
-    return {"callsign": tag_text(data, "call") or call, "surname": tag_text(data, "surname"), "name": tag_text(data, "name"), "patronymic": tag_text(data, "name2"), "city": tag_text(data, "city").rstrip(","), "locator": (tag_text(data, "locator") or tag_text(data, "grid"))[:4]}
+    grid = tag_text(data, "locator") or tag_text(data, "grid")
+    return {"callsign": tag_text(data, "call") or call, "surname": tag_text(data, "surname"), "name": tag_text(data, "name"), "patronymic": tag_text(data, "name2"), "city": tag_text(data, "city").rstrip(","), "locator": grid[:4].upper()}
 
 PAGE = r'''<!DOCTYPE html><html lang=ru><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>Люди</title>
 <style>body{font-family:system-ui,sans-serif;background:#faf7f4;margin:0;color:#1c1917}main{max-width:720px;margin:0 auto;padding:16px}h1{font-size:28px}form{background:#fff;border-radius:16px;padding:16px;margin:12px 0}input,select{display:block;width:100%;box-sizing:border-box;padding:14px;margin:8px 0;font-size:18px;border:1px solid #e7e5e4;border-radius:12px}button{display:block;width:100%;box-sizing:border-box;background:#e85d04;color:#fff;border:0;border-radius:12px;padding:14px;font-size:18px;font-weight:700;margin-top:10px}button.ghost{background:#fff;color:#9a3412;border:1px solid #e85d04}.phone{display:grid;grid-template-columns:110px 1fr;gap:8px}.phone select,.phone input{margin:0}.hint{color:#78716c;margin:8px 0 0}.card{background:#fff;border-radius:16px;padding:14px;margin:10px 0}.card .actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}.err{color:#b91c1c}</style></head>
