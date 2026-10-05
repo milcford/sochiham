@@ -116,9 +116,21 @@ class Handler(SimpleHTTPRequestHandler):
     def read_form(self):
         length = int(self.headers.get("Content-Length", "0"))
         return {k: v[0] for k, v in parse_qs(self.rfile.read(length).decode()).items()}
+    def delete_log(self, row_id):
+        if row_id == "all":
+            psql("DELETE FROM contest_logs;")
+        else:
+            psql(f"DELETE FROM contest_logs WHERE id={int(row_id)};")
     def do_POST(self):
         path = self.path.split("?", 1)[0]
         form = self.read_form()
+        if path == "/api/logs/delete":
+            if not self.cookie_ok(): return self.send_json({"error": "auth"}, 401)
+            try:
+                self.delete_log(form.get("id", ""))
+            except Exception as exc:
+                return self.send_json({"error": str(exc)}, 500)
+            return self.send_json({"ok": True})
         if path == "/api/round/login":
             callsign = form.get("callsign", "").strip().upper()
             row = psql("SELECT COALESCE(callsign,''), COALESCE(password,'') FROM round_host WHERE id=1;").strip().split("|")
@@ -178,13 +190,6 @@ class Handler(SimpleHTTPRequestHandler):
             if not self.host_ok(): return self.send_json({"error": "auth"}, 401)
             psql(f"DELETE FROM round_queue WHERE id={int(qs['id'][0])};")
             return self.send_json({"ok": True})
-        if path.startswith("/api/logs"):
-            if not self.cookie_ok(): return self.send_json({"error": "auth"}, 401)
-            if qs.get("id", [""])[0] == "all":
-                psql("DELETE FROM contest_logs;")
-            else:
-                psql(f"DELETE FROM contest_logs WHERE id={int(qs['id'][0])};")
-            return self.send_json({"ok": True})
         if not self.cookie_ok(): return self.send_json({"error": "auth"}, 401)
         psql(f"DELETE FROM operators WHERE id={int(qs['id'][0])};")
         self.send_json({"ok": True})
@@ -203,12 +208,12 @@ const login=document.getElementById('login'), app=document.getElementById('app')
 function mask(v){const d=v.replace(/\D/g,'').slice(0,10); let s=d.slice(0,3); if(d.length>3)s+=' '+d.slice(3,6); if(d.length>6)s+='-'+d.slice(6,8); if(d.length>8)s+='-'+d.slice(8,10); return s;}
 document.getElementById('number').addEventListener('input', e=>{e.target.value=mask(e.target.value);});
 function makePass(){const words=['море','волна','маяк','гора','чайка','эфир','солнце','антенна']; const pass=words[Math.floor(Math.random()*words.length)]+'-'+String(Math.floor(Math.random()*90)+10); const field=document.getElementById('host-pass'); field.value=pass; field.type='text';}
-async function api(url, opts){const res=await fetch(url, opts); if(res.status==401){app.hidden=true; login.hidden=false; throw new Error('auth');} return res.json();}
+async function api(url, opts){const res=await fetch(url, opts); if(res.status==401){app.hidden=true; login.hidden=false; throw new Error('auth');} const data=await res.json(); if(!res.ok) throw new Error(data.error||'ошибка'); return data;}
 async function loadLocators(){const list=await api('/api/locators'); const sel=document.getElementById('locator'); const cur=sel.value; sel.innerHTML='<option value="">Локатор</option>'+list.map(x=>'<option value="'+x.code+'">'+x.code+' — '+x.title+'</option>').join(''); sel.value=cur;}
 async function loadHostCalls(){const calls=await api('/api/calls'); document.getElementById('host-calls').innerHTML=calls.map(p=>'<option value="'+p.callsign+'">'+p.callsign+' '+(p.name||'')+'</option>').join('');}
-async function loadLogs(){const rows=await api('/api/logs'); document.getElementById('logs').innerHTML=rows.map(r=>'<div class=log><span>'+r.worked_at+' '+r.my_call+' — '+r.dx_call+' · '+r.band+'</span><button class=ghost type=button onclick=delLog('+r.id+')>Удалить</button></div>').join('')||'<p>Пока нет связей</p>';}
-async function delLog(id){if(!confirm('Удалить эту связь?')) return; await api('/api/logs?id='+id,{method:'DELETE'}); loadLogs();}
-async function clearLogs(){if(!confirm('Удалить все связи Кубка?')) return; await api('/api/logs?id=all',{method:'DELETE'}); loadLogs();}
+async function loadLogs(){const rows=await api('/api/logs'); document.getElementById('logs').innerHTML=rows.map(r=>'<div class=log><span>'+r.worked_at+' '+r.my_call+' — '+r.dx_call+' · '+r.band+'</span><button class=ghost type=button onclick="delLog('+r.id+')">Удалить</button></div>').join('')||'<p>Пока нет связей</p>';}
+async function delLog(id){if(!confirm('Удалить эту связь?')) return; try{await api('/api/logs/delete',{method:'POST', body:new URLSearchParams({id})}); loadLogs();}catch(e){alert(e.message);}}
+async function clearLogs(){if(!confirm('Удалить все связи Кубка?')) return; try{await api('/api/logs/delete',{method:'POST', body:new URLSearchParams({id:'all'})}); loadLogs();}catch(e){alert(e.message);}}
 login.onsubmit=async(e)=>{e.preventDefault(); const res=await fetch('/login',{method:'POST', body:new URLSearchParams(new FormData(login))}); if(!res.ok){document.getElementById('login-err').textContent='Неверный пароль'; return;} login.hidden=true; app.hidden=false; await loadLocators(); await loadHostCalls(); load(); loadLogs();};
 document.getElementById('host').onsubmit=async(e)=>{e.preventDefault(); await api('/api/round/host',{method:'POST', body:new URLSearchParams(new FormData(e.target))}); alert('Ведущий назначен. Пароль: '+document.getElementById('host-pass').value);};
 async function load(){const people=await api('/api/operators'); document.getElementById('cards').innerHTML=people.map(p=>'<div class=card><b>'+p.callsign+'</b><div>'+(p.surname||'')+' '+p.name+' '+(p.patronymic||'')+'</div><div>'+(p.city||'')+' '+(p.locator||'')+'</div><div>'+(p.phone||'')+'</div><div class=actions><button type=button onclick=\'fill('+JSON.stringify(p)+')\'>Исправить</button><button class=ghost type=button onclick=del('+p.id+')>Удалить</button></div></div>').join('');}
