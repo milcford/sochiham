@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Вход — радиолюбители Сочи</title>
+<style>
+  body { margin:0; font-family: "Segoe UI", system-ui, sans-serif; background:#faf7f4; color:#1c1917; }
+  main { max-width:480px; margin:0 auto; padding:24px 16px; }
+  form, .card { background:#fff; border-radius:16px; padding:16px; }
+  input { width:100%; box-sizing:border-box; padding:12px; margin:8px 0; font-size:16px; border:1px solid #e7e5e4; border-radius:12px; }
+  button { width:100%; background:#e85d04; color:#fff; border:0; border-radius:12px; padding:14px; font-size:18px; font-weight:700; }
+  a { color:#e85d04; }
+  .err { color:#b91c1c; }
+  .ok { color:#1b7a3a; }
+</style>
+</head>
+<body>
+<main>
+  <p><a href="index.html">На портал</a></p>
+  <h1>Вход</h1>
+  <p>Позывной, как в списке людей. Если пароля ещё не было, придумайте его: он сохранится за этим позывным.</p>
+  <form id="enter">
+    <input name="callsign" placeholder="Позывной" required maxlength="12" autocomplete="username">
+    <input name="password" type="password" placeholder="Пароль" required maxlength="40" autocomplete="current-password">
+    <button>Войти</button>
+    <p class="err" id="err"></p>
+  </form>
+  <p class="ok" id="who"></p>
+  <p><a href="lyudi.html">Меня ещё нет в списке</a></p>
+</main>
+<script>
+const err = document.getElementById("err");
+fetch("/api/me").then(r => r.json()).then(me => {
+  if (me.callsign) document.getElementById("who").textContent = "Сейчас вы вошли как " + me.callsign + " " + (me.name || "");
+});
+document.getElementById("enter").onsubmit = async (e) => {
+  e.preventDefault();
+  err.textContent = "";
+  const body = new URLSearchParams(new FormData(e.target));
+  const res = await fetch("/api/enter", { method: "POST", body });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) { err.textContent = data.error || "Не пустило"; return; }
+  location.href = "chat.html";
+};
+</script>
+</body>
+</html>

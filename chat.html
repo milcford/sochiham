@@ -58,11 +58,8 @@
 </main>
 <div class="composer">
   <div class="box">
-    <p class="hint">Позывной и имя запомнятся на этом телефоне или компьютере.</p>
-    <div class="who-row">
-      <input id="callsign" placeholder="Позывной" maxlength="12" autocomplete="nickname">
-      <input id="name" placeholder="Имя" maxlength="40">
-    </div>
+    <p class="hint" id="who">Чтобы писать, войдите по позывному.</p>
+    <p id="login-link"><a href="login.html">Войти</a></p>
     <div id="picker" class="picker"></div>
     <div class="send-row">
       <button class="emoji" type="button" id="emoji-btn" title="Смайлики">☺</button>
@@ -85,8 +82,6 @@ let newest = 0;
 let stick = true;
 const seen = new Set();
 
-document.getElementById("callsign").value = localStorage.getItem("ham-call") || "";
-document.getElementById("name").value = localStorage.getItem("ham-name") || "";
 
 picker.innerHTML = EMOJI.map(e => `<button type="button" data-e="${e}">${e}</button>`).join("");
 picker.addEventListener("click", (ev) => {
@@ -100,7 +95,13 @@ picker.addEventListener("click", (ev) => {
 document.getElementById("emoji-btn").onclick = () => picker.classList.toggle("open");
 
 function esc(s) {
-  return String(s).replace(/[&<>"']/g, c => ({ "&":"&", "<":"<", ">":">", '"':""", "'":"&#39;" }[c]));
+  return String(s).replace(/[&<>"']/g, function (c) {
+    if (c === "&") return "&" + "amp;";
+    if (c === "<") return "&" + "lt;";
+    if (c === ">") return "&" + "gt;";
+    if (c === '"') return "&" + "quot;";
+    return "&" + "#39;";
+  });
 }
 function dayKey(iso) { return (iso || "").slice(0, 10); }
 function clock(iso) {
@@ -109,9 +110,8 @@ function clock(iso) {
   if (Number.isNaN(d.getTime())) return "";
   return d.toLocaleString("ru-RU", { day:"2-digit", month:"short", hour:"2-digit", minute:"2-digit" });
 }
-function mineCall() {
-  return (document.getElementById("callsign").value || "").trim().toUpperCase();
-}
+let me = { callsign: "" };
+function mineCall() { return me.callsign || ""; }
 function draw(list, where) {
   const frag = document.createDocumentFragment();
   let prevDay = where === "after" ? logEl.dataset.lastDay || "" : "";
@@ -180,22 +180,25 @@ document.querySelectorAll(".rooms button").forEach(btn => {
     document.querySelectorAll(".rooms button").forEach(b => b.classList.remove("on"));
     btn.classList.add("on");
     room = btn.dataset.room;
-    openRoom().catch(showErr);
+    fetch("/api/me").then(r => r.json()).then(data => {
+  me = data || {};
+  if (me.callsign) {
+    document.getElementById("who").textContent = "Вы вошли как " + me.callsign + (me.name ? " · " + me.name : "");
+    document.getElementById("login-link").textContent = "";
+  }
+}).finally(() => openRoom().catch(showErr));
   };
 });
 function showErr(e) { errEl.textContent = e.message || "Не получилось"; }
 async function send() {
   errEl.textContent = "";
-  const callsign = document.getElementById("callsign").value.trim();
-  const name = document.getElementById("name").value.trim();
+  if (!me.callsign) { errEl.textContent = "Сначала войдите по позывному."; return; }
   const text = textEl.value.trim();
-  if (!callsign || !name || !text) { errEl.textContent = "Нужны позывной, имя и текст."; return; }
-  localStorage.setItem("ham-call", callsign.toUpperCase());
-  localStorage.setItem("ham-name", name);
+  if (!text) { errEl.textContent = "Напишите текст."; return; }
   const res = await fetch("/api/messages", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ room, callsign, name, text })
+    body: JSON.stringify({ room, text })
   });
   const data = await res.json();
   if (!res.ok) { errEl.textContent = data.error || "Не отправилось"; return; }
@@ -218,7 +221,13 @@ setInterval(async () => {
     if (list.length) draw(list, "after");
   } catch (e) {}
 }, 3000);
-openRoom().catch(showErr);
+fetch("/api/me").then(r => r.json()).then(data => {
+  me = data || {};
+  if (me.callsign) {
+    document.getElementById("who").textContent = "Вы вошли как " + me.callsign + (me.name ? " · " + me.name : "");
+    document.getElementById("login-link").textContent = "";
+  }
+}).finally(() => openRoom().catch(showErr));
 </script>
 </body>
 </html>
