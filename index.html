@@ -25,7 +25,7 @@
   .live em { font-style:normal; font-size:22px; }
   button.big, a.big { display:block; width:100%; border:0; background:var(--orange); color:#fff; font-size:18px; font-weight:700; border-radius:14px; padding:14px; margin:8px 0; cursor:pointer; text-align:center; text-decoration:none; box-sizing:border-box; }
   button.ghost, a.ghost { background:#fff; color:var(--orange); border:2px solid var(--orange); }
-  .row { display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px solid #f5f5f4; }
+  .row { display:flex; justify-content:space-between; gap:12px; padding:10px 0; border-bottom:1px solid #f5f5f4; }
   .grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
   .shot, .video-card { background:#fff; border-radius:16px; overflow:hidden; box-shadow:0 1px 2px rgba(0,0,0,.05); margin-bottom:12px; }
   .shot img, .video-card img { width:100%; height:180px; object-fit:cover; display:block; background:#eee; }
@@ -43,11 +43,11 @@
   <div><b>Радиолюбители</b><span>Сочи и все, кто с нами в эфире</span></div>
   <nav>
     <button class="on" data-tab="home">Эфир</button>
+    <button data-tab="people">Люди</button>
     <button data-tab="photo">Фото</button>
     <button data-tab="video">Видео</button>
     <button data-tab="ads">Объявления</button>
     <a href="kubok.html">Кубок</a>
-    <a href="lyudi.html">Добавить себя</a>
     <a href="vedushchiy.html">Ведущему</a>
   </nav>
 </header>
@@ -61,9 +61,14 @@
       <a class="big ghost" href="vedushchiy.html">Войти ведущему</a>
     </div>
     <div class="card">
-      <b>Кубок и люди</b>
       <a class="big" href="kubok.html">Подсчёт Кубка</a>
-      <a class="big ghost" href="lyudi.html">Добавить свой позывной</a>
+    </div>
+  </section>
+  <section id="people" class="hide">
+    <div class="card">
+      <b>Радиолюбители</b>
+      <div id="people-list"><div class="row"><span>загружаю</span></div></div>
+      <a class="big ghost" href="lyudi.html">Добавить себя</a>
     </div>
   </section>
   <section id="photo" class="hide">
@@ -94,7 +99,7 @@
 </main>
 <footer>Пробная страница клуба. Домен пока не нужен.</footer>
 <script>
-document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{document.querySelectorAll("nav button").forEach(x=>x.classList.remove("on")); b.classList.add("on"); ["home","photo","video","ads"].forEach(id=>document.getElementById(id).classList.toggle("hide", id!==b.dataset.tab));});
+document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{document.querySelectorAll("nav button").forEach(x=>x.classList.remove("on")); b.classList.add("on"); ["home","people","photo","video","ads"].forEach(id=>document.getElementById(id).classList.toggle("hide", id!==b.dataset.tab));});
 function addAd(e){e.preventDefault(); const el=document.createElement("div"); el.className="card"; el.innerHTML="<b>"+document.getElementById("kind").value+" "+document.getElementById("what").value+"</b><p>"+(document.getElementById("where").value||"без района")+"</p>"; document.getElementById("adlist").prepend(el); e.target.reset();}
 async function round(){
   try {
@@ -105,7 +110,15 @@ async function round(){
     document.getElementById('queue').innerHTML=(data.queue||[]).map((p,i)=>'<div class="row"><span>'+(i+1)+'</span><b>'+p.callsign+' '+(p.name||'')+'</b></div>').join('')||'<div class="row"><span>пока пусто</span></div>';
   } catch(e) {}
 }
-round(); setInterval(round, 5000);
+async function people(){
+  try {
+    const rows=await fetch('/api/people').then(r=>r.json());
+    document.getElementById('people-list').innerHTML=rows.map(p=>'<div class="row"><b>'+p.callsign+'</b><span>'+[p.surname,p.name,p.patronymic,p.city].filter(Boolean).join(' ')+'</span></div>').join('')||'<div class="row"><span>пока никого нет</span></div>';
+  } catch(e) {
+    document.getElementById('people-list').innerHTML='<div class="row"><span>список не открылся</span></div>';
+  }
+}
+round(); people(); setInterval(round, 5000);
 </script>
 </body>
 </html>
