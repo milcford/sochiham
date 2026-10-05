@@ -185,6 +185,13 @@ class Handler(SimpleHTTPRequestHandler):
             return self.send_html(ADMIN_PAGE)
         if path == "/api/round":
             return self.send_json(round_view())
+        if path == "/api/logout":
+            self.send_response(302)
+            self.send_header("Location", "/index.html")
+            self.send_header("Set-Cookie", "ham=; HttpOnly; Path=/; Max-Age=0")
+            self.send_header("Set-Cookie", "ham_call=; Path=/; Max-Age=0")
+            self.end_headers()
+            return
         if path == "/api/me":
             call = ham_from_cookie(self.headers.get("Cookie", ""))
             if not call:

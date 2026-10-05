@@ -97,11 +97,11 @@ async function post(url, form) {
 }
 document.getElementById("login").onsubmit = async (e) => {
   e.preventDefault();
-  if (await post("/api/enter", e.target)) location.href = "chat.html";
+  if (await post("/api/enter", e.target)) location.href = "index.html";
 };
 document.getElementById("reg").onsubmit = async (e) => {
   e.preventDefault();
-  if (await post("/api/register", e.target)) location.href = "chat.html";
+  if (await post("/api/register", e.target)) location.href = "index.html";
 };
 document.getElementById("forgot").onsubmit = async (e) => {
   e.preventDefault();
@@ -116,7 +116,7 @@ document.getElementById("reset").onsubmit = async (e) => {
   const res = await fetch("/api/reset", { method: "POST", body });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) { err.textContent = data.error || "Ссылка не подошла"; return; }
-  location.href = "chat.html";
+  location.href = "index.html";
 };
 </script>
 </body>

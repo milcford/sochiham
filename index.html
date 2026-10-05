@@ -52,7 +52,7 @@
     <button data-tab="video">Видео</button>
     <button data-tab="ads">Объявления</button>
     <a href="chat.html">Чат</a>
-    <a href="login.html">Войти</a>
+    <a href="login.html" id="login-link">Войти</a>
     <a href="kubok.html">Кубок</a>
     <a href="vedushchiy.html">Ведущему</a>
   </nav>
@@ -103,7 +103,7 @@
     <div id="adlist"></div>
   </section>
 </main>
-<footer>Пробная страница клуба. Домен пока не нужен.</footer>
+<footer>Пробная страница клуба. <span id="who"></span></footer>
 <script>
 document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{document.querySelectorAll("nav button").forEach(x=>x.classList.remove("on")); b.classList.add("on"); ["home","people","photo","video","ads"].forEach(id=>document.getElementById(id).classList.toggle("hide", id!==b.dataset.tab));});
 function addAd(e){e.preventDefault(); const el=document.createElement("div"); el.className="card"; el.innerHTML="<b>"+document.getElementById("kind").value+" "+document.getElementById("what").value+"</b><p>"+(document.getElementById("where").value||"без района")+"</p>"; document.getElementById("adlist").prepend(el); e.target.reset();}
@@ -125,6 +125,14 @@ async function people(){
   }
 }
 round(); people(); setInterval(round, 5000);
+fetch("/api/me").then(r=>r.json()).then(me=>{
+  const link=document.getElementById("login-link");
+  const who=document.getElementById("who");
+  if(!me.callsign){ who.textContent="Вы не вошли"; return; }
+  link.textContent=me.callsign;
+  link.href="login.html";
+  who.innerHTML="Вы вошли как "+me.callsign+(me.name?" · "+me.name:"")+' · <a href="/api/logout">Выйти</a>';
+});
 </script>
 </body>
 </html>
