@@ -74,38 +74,28 @@ def password_ok(stored, given):
     return hmac.compare_digest(given.encode(), stored.encode())
 
 def send_mail(to, subject, body):
-    host = os.environ.get("SMTP_HOST", "")
-    if not host:
-        raise RuntimeError("Почта на сервере ещё не настроена.")
-    port = int(os.environ.get("SMTP_PORT", "465"))
+    host = os.environ.get("SMTP_HOST", "smtp.gmail.com").strip() or "smtp.gmail.com"
     user = os.environ.get("SMTP_USER", "").strip()
     password = os.environ.get("SMTP_PASSWORD", "").replace(" ", "")
     sender = os.environ.get("SMTP_FROM", user).strip()
+    if not user or not password:
+        raise RuntimeError("В qrz.env нет адреса или пароля приложения.")
     msg = MIMEText(body, "plain", "utf-8")
     msg["From"] = sender
     msg["To"] = to
     msg["Subject"] = Header(subject, "utf-8")
     raw = msg.as_string()
     try:
-        if port == 465:
-            smtp = smtplib.SMTP_SSL(host, port, timeout=20)
-        else:
-            smtp = smtplib.SMTP(host, port, timeout=20)
-            smtp.ehlo()
-            smtp.starttls()
-            smtp.ehlo()
-        try:
-            if user:
-                smtp.login(user, password)
-            smtp.sendmail(sender, [to], raw)
-        finally:
-            smtp.quit()
+        smtp = smtplib.SMTP_SSL(host, 465, timeout=30)
+        smtp.login(user, password)
+        smtp.sendmail(sender, [to], raw)
+        smtp.quit()
     except Exception as exc:
         text = str(exc)
-        if "Authentication" in text or "535" in text or "Username and Password" in text:
-            raise RuntimeError("Gmail не принял пароль. Нужен пароль приложения, 16 букв без пробелов.")
-        if "closed" in text or "timed out" in text:
-            raise RuntimeError("Gmail закрыл соединение. В qrz.env поставьте SMTP_PORT=465 и перезапустите портал.")
+        if "535" in text or "Authentication" in text or "Username and Password" in text:
+            raise RuntimeError("Gmail не принял пароль. Нужны 16 букв пароля приложения, без пробелов.")
+        if "connect" in text or "closed" in text or "timed out" in text:
+            raise RuntimeError("Сервер не смог связаться с Gmail. Проверьте интернет на сервере и пароль приложения.")
         raise RuntimeError(text)
 
 def ham_from_cookie(header):
