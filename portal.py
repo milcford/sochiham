@@ -49,10 +49,14 @@ def ham_token(callsign):
     return hmac.new(SECRET.encode(), ("ham-" + callsign).encode(), hashlib.sha256).hexdigest()
 
 def ensure_login():
-    psql("ALTER TABLE operators ADD COLUMN IF NOT EXISTS password text DEFAULT '';")
-    psql("ALTER TABLE operators ADD COLUMN IF NOT EXISTS email text DEFAULT '';")
-    psql("ALTER TABLE operators ADD COLUMN IF NOT EXISTS reset_token text DEFAULT '';")
-    psql("ALTER TABLE operators ADD COLUMN IF NOT EXISTS reset_until timestamptz;")
+    psql("""CREATE TABLE IF NOT EXISTS site_accounts (
+      callsign text PRIMARY KEY,
+      name text NOT NULL,
+      email text NOT NULL,
+      password text NOT NULL,
+      reset_token text DEFAULT '',
+      reset_until timestamptz
+    );""")
 
 def hash_password(password):
     salt = secrets.token_hex(8)
@@ -99,7 +103,7 @@ def ham_from_cookie(header):
     return ""
 
 def ham_profile(callsign):
-    row = psql(f"SELECT callsign, COALESCE(name,''), COALESCE(password,''), COALESCE(email,'') FROM operators WHERE callsign={q(callsign)} LIMIT 1;").strip()
+    row = psql(f"SELECT callsign, COALESCE(name,''), COALESCE(password,''), COALESCE(email,'') FROM site_accounts WHERE callsign={q(callsign)} LIMIT 1;").strip()
     if not row:
         return None
     bits = row.split("|")
@@ -253,18 +257,21 @@ class Handler(SimpleHTTPRequestHandler):
             return self.send_json({"error": "Нужны позывной, имя, почта и пароль от 4 знаков."}, 400)
         if ham_profile(callsign):
             return self.send_json({"error": "Такой позывной уже есть. Войдите или восстановите пароль."}, 409)
-        taken = psql(f"SELECT callsign FROM operators WHERE lower(email)={q(email)} LIMIT 1;").strip()
+        taken = psql(f"SELECT callsign FROM site_accounts WHERE lower(email)={q(email)} LIMIT 1;").strip()
         if taken:
             return self.send_json({"error": "Эта почта уже занята."}, 409)
-        psql(f"INSERT INTO operators (callsign, name, email, password) VALUES ({q(callsign)}, {q(name)}, {q(email)}, {q(hash_password(password))});")
+        psql(f"INSERT INTO site_accounts (callsign, name, email, password) VALUES ({q(callsign)}, {q(name)}, {q(email)}, {q(hash_password(password))});")
+        found = psql(f"SELECT id FROM operators WHERE callsign={q(callsign)} LIMIT 1;").strip()
+        if not found:
+            psql(f"INSERT INTO operators (callsign, name) VALUES ({q(callsign)}, {q(name)});")
         return self.set_ham_cookie(callsign)
     def forgot(self, form):
         ensure_login()
         email = form.get("email", "").strip().lower()
-        row = psql(f"SELECT callsign FROM operators WHERE lower(email)={q(email)} LIMIT 1;").strip()
+        row = psql(f"SELECT callsign FROM site_accounts WHERE lower(email)={q(email)} LIMIT 1;").strip()
         if row:
             token = secrets.token_urlsafe(24)
-            psql(f"UPDATE operators SET reset_token={q(token)}, reset_until=now()+interval '2 hours' WHERE callsign={q(row)};")
+            psql(f"UPDATE site_accounts SET reset_token={q(token)}, reset_until=now()+interval '2 hours' WHERE callsign={q(row)};")
             host = self.headers.get("Host", "127.0.0.1:8080")
             link = f"http://{host}/login.html?reset={token}"
             try:
@@ -278,10 +285,10 @@ class Handler(SimpleHTTPRequestHandler):
         password = form.get("password", "")
         if len(password) < 4 or not token:
             return self.send_json({"error": "Нужен новый пароль, хотя бы 4 знака."}, 400)
-        row = psql(f"SELECT callsign FROM operators WHERE reset_token={q(token)} AND reset_until>now() LIMIT 1;").strip()
+        row = psql(f"SELECT callsign FROM site_accounts WHERE reset_token={q(token)} AND reset_until>now() LIMIT 1;").strip()
         if not row:
             return self.send_json({"error": "Ссылка устарела. Запросите новую."}, 400)
-        psql(f"UPDATE operators SET password={q(hash_password(password))}, reset_token='', reset_until=NULL WHERE callsign={q(row)};")
+        psql(f"UPDATE site_accounts SET password={q(hash_password(password))}, reset_token='', reset_until=NULL WHERE callsign={q(row)};")
         return self.set_ham_cookie(row)
     def chat_post(self):
         callsign = ham_from_cookie(self.headers.get("Cookie", ""))
