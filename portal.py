@@ -43,6 +43,31 @@ def tag_text(root, name):
         if el.tag.split("}")[-1] == name and el.text: return el.text.strip()
     return ""
 
+
+def ham_token(callsign):
+    return hmac.new(SECRET.encode(), ("ham-" + callsign).encode(), hashlib.sha256).hexdigest()
+
+def ensure_login():
+    psql("ALTER TABLE operators ADD COLUMN IF NOT EXISTS password text DEFAULT '';")
+
+def ham_from_cookie(header):
+    parts = {}
+    for bit in (header or "").split(";"):
+        if "=" in bit:
+            k, v = bit.strip().split("=", 1)
+            parts[k] = v
+    call = parts.get("ham_call", "").upper()
+    if call and parts.get("ham") == ham_token(call):
+        return call
+    return ""
+
+def ham_profile(callsign):
+    row = psql(f"SELECT callsign, COALESCE(name,''), COALESCE(password,'') FROM operators WHERE callsign={q(callsign)} LIMIT 1;").strip()
+    if not row:
+        return None
+    bits = row.split("|")
+    return {"callsign": bits[0], "name": bits[1] if len(bits)>1 else "", "password": bits[2] if len(bits)>2 else ""}
+
 def ensure_chat():
     psql("CREATE TABLE IF NOT EXISTS chat_messages (id bigserial PRIMARY KEY, room text NOT NULL, callsign text NOT NULL, name text NOT NULL, body text NOT NULL, created_at timestamptz NOT NULL DEFAULT now());")
     if psql("SELECT COUNT(*) FROM chat_messages;").strip() == "0":
@@ -112,7 +137,15 @@ class Handler(SimpleHTTPRequestHandler):
             return self.send_html(ADMIN_PAGE)
         if path == "/api/round":
             return self.send_json(round_view())
+        if path == "/api/me":
+            call = ham_from_cookie(self.headers.get("Cookie", ""))
+            if not call:
+                return self.send_json({"callsign": ""})
+            person = ham_profile(call) or {"callsign": call, "name": ""}
+            return self.send_json({"callsign": person["callsign"], "name": person["name"]})
         if path == "/api/messages":
+            if not ham_from_cookie(self.headers.get("Cookie", "")):
+                return self.send_json({"error": "Сначала войдите по позывному."}, 401)
             qs = parse_qs(self.path.split("?", 1)[-1])
             room = (qs.get("room") or ["general"])[0]
             if room not in ("general", "table", "market"):
@@ -156,7 +189,34 @@ class Handler(SimpleHTTPRequestHandler):
             psql("DELETE FROM contest_logs;")
         else:
             psql(f"DELETE FROM contest_logs WHERE id={int(row_id)};")
+    def enter(self, form):
+        ensure_login()
+        callsign = form.get("callsign", "").strip().upper()
+        password = form.get("password", "")
+        person = ham_profile(callsign)
+        if not person:
+            return self.send_json({"error": "Такого позывного нет. Сначала добавьте себя в список людей."}, 404)
+        if not person["password"]:
+            if len(password) < 4:
+                return self.send_json({"error": "Придумайте пароль, хотя бы 4 знака. Он сохранится за позывным."}, 400)
+            psql(f"UPDATE operators SET password={q(password)} WHERE callsign={q(callsign)};")
+        elif not hmac.compare_digest(password.encode(), person["password"].encode()):
+            return self.send_json({"error": "Неверный пароль."}, 403)
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        body = b'{"ok":true}'
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Set-Cookie", f"ham={ham_token(callsign)}; HttpOnly; Path=/; Max-Age=2592000")
+        self.send_header("Set-Cookie", f"ham_call={callsign}; Path=/; Max-Age=2592000")
+        self.end_headers()
+        self.wfile.write(body)
     def chat_post(self):
+        callsign = ham_from_cookie(self.headers.get("Cookie", ""))
+        if not callsign:
+            return self.send_json({"error": "Сначала войдите по позывному."}, 401)
+        person = ham_profile(callsign)
+        if not person:
+            return self.send_json({"error": "Позывной не найден."}, 401)
         length = int(self.headers.get("Content-Length", "0"))
         raw = self.rfile.read(min(length, 8000))
         try:
@@ -164,11 +224,10 @@ class Handler(SimpleHTTPRequestHandler):
         except Exception:
             return self.send_json({"error": "Не разобрал сообщение."}, 400)
         room = data.get("room") if data.get("room") in ("general", "table", "market") else "general"
-        callsign = str(data.get("callsign") or "").strip().upper()[:12]
-        name = str(data.get("name") or "").strip()[:40]
+        name = person["name"] or callsign
         text = str(data.get("text") or "").strip()[:1000]
-        if len(callsign) < 3 or not name or not text:
-            return self.send_json({"error": "Нужны позывной, имя и текст."}, 400)
+        if not text:
+            return self.send_json({"error": "Напишите текст."}, 400)
         ensure_chat()
         psql(f"INSERT INTO chat_messages (room, callsign, name, body) VALUES ({q(room)}, {q(callsign)}, {q(name)}, {q(text)});")
         row = psql("SELECT row_to_json(t)::text FROM (SELECT id, room, callsign, name, body AS text, to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS created_at FROM chat_messages ORDER BY id DESC LIMIT 1) t;")
@@ -178,6 +237,8 @@ class Handler(SimpleHTTPRequestHandler):
         if path == "/api/messages":
             return self.chat_post()
         form = self.read_form()
+        if path == "/api/enter":
+            return self.enter(form)
         if path == "/api/logs/delete":
             if not self.cookie_ok(): return self.send_json({"error": "auth"}, 401)
             try:
