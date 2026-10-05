@@ -77,21 +77,36 @@ def send_mail(to, subject, body):
     host = os.environ.get("SMTP_HOST", "")
     if not host:
         raise RuntimeError("Почта на сервере ещё не настроена.")
-    port = int(os.environ.get("SMTP_PORT", "587"))
-    user = os.environ.get("SMTP_USER", "")
-    password = os.environ.get("SMTP_PASSWORD", "")
-    sender = os.environ.get("SMTP_FROM", user)
+    port = int(os.environ.get("SMTP_PORT", "465"))
+    user = os.environ.get("SMTP_USER", "").strip()
+    password = os.environ.get("SMTP_PASSWORD", "").replace(" ", "")
+    sender = os.environ.get("SMTP_FROM", user).strip()
     msg = MIMEText(body, "plain", "utf-8")
     msg["From"] = sender
     msg["To"] = to
     msg["Subject"] = Header(subject, "utf-8")
-    with smtplib.SMTP(host, port, timeout=20) as smtp:
-        smtp.ehlo()
-        smtp.starttls()
-        smtp.ehlo()
-        if user:
-            smtp.login(user, password)
-        smtp.sendmail(sender, [to], msg.as_string())
+    raw = msg.as_string()
+    try:
+        if port == 465:
+            smtp = smtplib.SMTP_SSL(host, port, timeout=20)
+        else:
+            smtp = smtplib.SMTP(host, port, timeout=20)
+            smtp.ehlo()
+            smtp.starttls()
+            smtp.ehlo()
+        try:
+            if user:
+                smtp.login(user, password)
+            smtp.sendmail(sender, [to], raw)
+        finally:
+            smtp.quit()
+    except Exception as exc:
+        text = str(exc)
+        if "Authentication" in text or "535" in text or "Username and Password" in text:
+            raise RuntimeError("Gmail не принял пароль. Нужен пароль приложения, 16 букв без пробелов.")
+        if "closed" in text or "timed out" in text:
+            raise RuntimeError("Gmail закрыл соединение. В qrz.env поставьте SMTP_PORT=465 и перезапустите портал.")
+        raise RuntimeError(text)
 
 def ham_from_cookie(header):
     parts = {}
