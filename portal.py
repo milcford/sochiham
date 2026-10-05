@@ -162,6 +162,11 @@ def qrz_lookup(call):
     return {"callsign": tag_text(data, "call") or call, "surname": tag_text(data, "surname"), "name": tag_text(data, "name"), "patronymic": tag_text(data, "name2"), "city": tag_text(data, "city").rstrip(","), "locator": grid[:4].upper(), "phone": phone}
 
 class Handler(SimpleHTTPRequestHandler):
+    def end_headers(self):
+        path = self.path.split("?", 1)[0]
+        if path.endswith(".html") or path in ("/", "/index.html"):
+            self.send_header("Cache-Control", "no-store")
+        super().end_headers()
     def cookie_ok(self):
         return f"admin={token()}" in self.headers.get("Cookie", "").split("; ")
     def host_ok(self):

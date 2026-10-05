@@ -57,6 +57,7 @@
     <a href="vedushchiy.html">Ведущему</a>
   </nav>
 </header>
+<div id="who" style="max-width:980px;margin:12px auto 0;padding:0 16px;color:#1b7a3a;font-weight:700"></div>
 <main>
   <section id="home">
     <div class="card when"><div><h1>Воскресенье, 9:00</h1><p class="mhz">145.525 МГц</p></div><div style="font-size:42px">📻</div></div>
@@ -103,7 +104,7 @@
     <div id="adlist"></div>
   </section>
 </main>
-<footer>Пробная страница клуба. <span id="who"></span></footer>
+<footer>Пробная страница клуба.</footer>
 <script>
 document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{document.querySelectorAll("nav button").forEach(x=>x.classList.remove("on")); b.classList.add("on"); ["home","people","photo","video","ads"].forEach(id=>document.getElementById(id).classList.toggle("hide", id!==b.dataset.tab));});
 function addAd(e){e.preventDefault(); const el=document.createElement("div"); el.className="card"; el.innerHTML="<b>"+document.getElementById("kind").value+" "+document.getElementById("what").value+"</b><p>"+(document.getElementById("where").value||"без района")+"</p>"; document.getElementById("adlist").prepend(el); e.target.reset();}
@@ -128,11 +129,15 @@ round(); people(); setInterval(round, 5000);
 fetch("/api/me").then(r=>r.json()).then(me=>{
   const link=document.getElementById("login-link");
   const who=document.getElementById("who");
-  if(!me.callsign){ who.textContent="Вы не вошли"; return; }
+  if(!link||!who) return;
+  if(!me.callsign){ who.textContent=""; link.textContent="Войти"; return; }
   link.textContent=me.callsign;
   link.href="login.html";
+  link.style.background="#1b7a3a";
+  link.style.color="#fff";
+  link.style.borderColor="#1b7a3a";
   who.innerHTML="Вы вошли как "+me.callsign+(me.name?" · "+me.name:"")+' · <a href="/api/logout">Выйти</a>';
-});
+}).catch(()=>{});
 </script>
 </body>
 </html>
