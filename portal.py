@@ -84,12 +84,12 @@ def send_mail(to, subject, body):
     msg["From"] = sender
     msg["To"] = to
     msg["Subject"] = subject
-    msg.set_content(body)
+    msg.set_content(body, charset="utf-8")
     with smtplib.SMTP(host, port, timeout=20) as smtp:
         smtp.starttls()
         if user:
             smtp.login(user, password)
-        smtp.send_message(msg)
+        smtp.sendmail(sender, [to], msg.as_bytes())
 
 def ham_from_cookie(header):
     parts = {}
