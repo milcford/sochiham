@@ -42,6 +42,27 @@ def tag_text(root, name):
     for el in root.iter():
         if el.tag.split("}")[-1] == name and el.text: return el.text.strip()
     return ""
+
+def ensure_chat():
+    psql("CREATE TABLE IF NOT EXISTS chat_messages (id bigserial PRIMARY KEY, room text NOT NULL, callsign text NOT NULL, name text NOT NULL, body text NOT NULL, created_at timestamptz NOT NULL DEFAULT now());")
+    if psql("SELECT COUNT(*) FROM chat_messages;").strip() == "0":
+        psql("INSERT INTO chat_messages (room, callsign, name, body) VALUES ('general','RZ6D','Сергей','Добро пожаловать в общий чат. Пишите позывной и коротко, как в эфире.'), ('general','R6A','Клуб','Воскресный круглый стол — в соседней комнате. Частота на главной.'), ('table','RZ6D','Сергей','Кто будет в воскресенье — отметьтесь здесь.'), ('market','RW6YYY','Пётр','Отдам кусок кабеля, Сочи, самовывоз.');")
+
+def chat_messages(room, before=0, after=0):
+    ensure_chat()
+    where = f"room={q(room)}"
+    order = "DESC"
+    if after:
+        where += f" AND id>{int(after)}"
+        order = "ASC"
+    elif before:
+        where += f" AND id<{int(before)}"
+    raw = psql("SELECT COALESCE(json_agg(row_to_json(t)), '[]') FROM (SELECT id, room, callsign, name, body AS text, to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS created_at FROM chat_messages WHERE " + where + " ORDER BY id " + order + " LIMIT 40) t;")
+    rows = json.loads(raw.strip() or "[]")
+    if order == "DESC":
+        rows.reverse()
+    return rows
+
 def qrz_call(path, params):
     url = "https://api.qrz.ru/" + path + "?" + urlencode(params)
     req = Request(url, headers={"User-Agent": "sochiham/1.0"})
@@ -91,6 +112,20 @@ class Handler(SimpleHTTPRequestHandler):
             return self.send_html(ADMIN_PAGE)
         if path == "/api/round":
             return self.send_json(round_view())
+        if path == "/api/messages":
+            qs = parse_qs(self.path.split("?", 1)[-1])
+            room = (qs.get("room") or ["general"])[0]
+            if room not in ("general", "table", "market"):
+                room = "general"
+            try:
+                before = int((qs.get("before") or ["0"])[0])
+                after = int((qs.get("after") or ["0"])[0])
+            except ValueError:
+                before = after = 0
+            try:
+                return self.send_json({"messages": chat_messages(room, before, after)})
+            except Exception as exc:
+                return self.send_json({"error": str(exc)}, 500)
         if path == "/api/logs":
             if not self.cookie_ok(): return self.send_json({"error": "auth"}, 401)
             rows = psql("SELECT id, my_call, dx_call, band, to_char(worked_at, 'DD.MM HH24:MI') FROM contest_logs ORDER BY worked_at DESC;")
@@ -121,8 +156,27 @@ class Handler(SimpleHTTPRequestHandler):
             psql("DELETE FROM contest_logs;")
         else:
             psql(f"DELETE FROM contest_logs WHERE id={int(row_id)};")
+    def chat_post(self):
+        length = int(self.headers.get("Content-Length", "0"))
+        raw = self.rfile.read(min(length, 8000))
+        try:
+            data = json.loads(raw.decode() or "{}")
+        except Exception:
+            return self.send_json({"error": "Не разобрал сообщение."}, 400)
+        room = data.get("room") if data.get("room") in ("general", "table", "market") else "general"
+        callsign = str(data.get("callsign") or "").strip().upper()[:12]
+        name = str(data.get("name") or "").strip()[:40]
+        text = str(data.get("text") or "").strip()[:1000]
+        if len(callsign) < 3 or not name or not text:
+            return self.send_json({"error": "Нужны позывной, имя и текст."}, 400)
+        ensure_chat()
+        psql(f"INSERT INTO chat_messages (room, callsign, name, body) VALUES ({q(room)}, {q(callsign)}, {q(name)}, {q(text)});")
+        row = psql("SELECT row_to_json(t)::text FROM (SELECT id, room, callsign, name, body AS text, to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS created_at FROM chat_messages ORDER BY id DESC LIMIT 1) t;")
+        return self.send_json({"message": json.loads(row.strip())})
     def do_POST(self):
         path = self.path.split("?", 1)[0]
+        if path == "/api/messages":
+            return self.chat_post()
         form = self.read_form()
         if path == "/api/logs/delete":
             if not self.cookie_ok(): return self.send_json({"error": "auth"}, 401)

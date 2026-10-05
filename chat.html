@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Чат — радиолюбители Сочи</title>
+<style>
+  :root { --orange:#e85d04; --green:#1b7a3a; --ink:#1c1917; --muted:#78716c; --bg:#faf7f4; --card:#fff; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: "Segoe UI", system-ui, sans-serif; background:var(--bg); color:var(--ink); height:100dvh; display:flex; flex-direction:column; }
+  header { background:#fff; border-bottom:3px solid var(--orange); padding:12px 16px; display:flex; align-items:center; justify-content:space-between; gap:12px; }
+  header b { font-size:18px; }
+  header span { color:var(--muted); font-size:13px; display:block; }
+  a.back { color:var(--orange); font-weight:700; text-decoration:none; white-space:nowrap; }
+  .rooms { display:flex; gap:8px; padding:10px 12px 0; max-width:860px; width:100%; margin:0 auto; }
+  .rooms button { border:1px solid #e7e5e4; background:#fff; border-radius:999px; padding:8px 12px; font-weight:700; cursor:pointer; }
+  .rooms button.on { background:var(--orange); color:#fff; border-color:var(--orange); }
+  main { flex:1; min-height:0; max-width:860px; width:100%; margin:0 auto; padding:10px 12px 0; display:flex; flex-direction:column; }
+  #log { flex:1; overflow:auto; background:#fff; border-radius:16px 16px 0 0; padding:12px; box-shadow:0 1px 2px rgba(0,0,0,.04); }
+  .older { display:block; width:100%; border:0; background:#f5f5f4; color:#44403c; border-radius:12px; padding:10px; font-weight:700; cursor:pointer; margin-bottom:10px; }
+  .day { text-align:center; color:var(--muted); font-size:12px; margin:12px 0; }
+  .msg { display:flex; gap:10px; margin:0 0 10px; }
+  .msg.mine { flex-direction:row-reverse; }
+  .bubble { max-width:min(78%, 560px); background:#f5f5f4; border-radius:16px; padding:8px 12px; }
+  .msg.mine .bubble { background:#fff1e8; }
+  .who { font-size:13px; font-weight:800; color:var(--green); }
+  .msg.mine .who { text-align:right; }
+  .text { white-space:pre-wrap; word-break:break-word; font-size:16px; line-height:1.35; margin-top:2px; }
+  .when { color:var(--muted); font-size:11px; margin-top:4px; }
+  .composer { background:#fff; border-top:1px solid #e7e5e4; padding:10px 12px 14px; }
+  .box { max-width:860px; margin:0 auto; }
+  .who-row, .send-row { display:flex; gap:8px; }
+  input, textarea { width:100%; border:1px solid #e7e5e4; border-radius:12px; padding:10px 12px; font-size:16px; font-family:inherit; }
+  textarea { resize:none; min-height:48px; max-height:120px; }
+  button.send, button.emoji { border:0; background:var(--orange); color:#fff; border-radius:12px; font-weight:800; cursor:pointer; }
+  button.send { padding:0 16px; }
+  button.emoji { background:#fff; color:#1c1917; border:1px solid #e7e5e4; width:48px; font-size:20px; }
+  .picker { display:none; flex-wrap:wrap; gap:4px; background:#fff; border:1px solid #e7e5e4; border-radius:14px; padding:8px; margin-bottom:8px; max-height:160px; overflow:auto; }
+  .picker.open { display:flex; }
+  .picker button { border:0; background:transparent; font-size:22px; cursor:pointer; width:36px; height:36px; border-radius:8px; }
+  .picker button:hover { background:#f5f5f4; }
+  .err { color:#b91c1c; font-size:14px; min-height:18px; margin:4px 0 0; }
+  .hint { color:var(--muted); font-size:13px; margin:0 0 8px; }
+</style>
+</head>
+<body>
+<header>
+  <div><b>Чат</b><span>Письма остаются. Можно листать вверх.</span></div>
+  <a class="back" href="index.html">На портал</a>
+</header>
+<div class="rooms">
+  <button class="on" data-room="general">Общий</button>
+  <button data-room="table">Круглый стол</button>
+  <button data-room="market">Барахолка</button>
+</div>
+<main>
+  <div id="log"></div>
+</main>
+<div class="composer">
+  <div class="box">
+    <p class="hint">Позывной и имя запомнятся на этом телефоне или компьютере.</p>
+    <div class="who-row">
+      <input id="callsign" placeholder="Позывной" maxlength="12" autocomplete="nickname">
+      <input id="name" placeholder="Имя" maxlength="40">
+    </div>
+    <div id="picker" class="picker"></div>
+    <div class="send-row">
+      <button class="emoji" type="button" id="emoji-btn" title="Смайлики">☺</button>
+      <textarea id="text" placeholder="Написать сообщение" maxlength="1000" rows="1"></textarea>
+      <button class="send" type="button" id="send">Отправить</button>
+    </div>
+    <p class="err" id="err"></p>
+  </div>
+</div>
+<script>
+const ROOMS = { general: "Общий", table: "Круглый стол", market: "Барахолка" };
+const EMOJI = "😀😁😂😊😉😎🤔😴👍👎👋🤝🙏💪❤️🔥✨⭐✅❌📻📡🎙️🎧📞🎤🔧🔌🔋⛰️🌊☀️🌧️❄️🏠🚗☕🎉🎊📌📝❓❗".split("");
+const logEl = document.getElementById("log");
+const errEl = document.getElementById("err");
+const textEl = document.getElementById("text");
+const picker = document.getElementById("picker");
+let room = "general";
+let oldest = 0;
+let newest = 0;
+let stick = true;
+const seen = new Set();
+
+document.getElementById("callsign").value = localStorage.getItem("ham-call") || "";
+document.getElementById("name").value = localStorage.getItem("ham-name") || "";
+
+picker.innerHTML = EMOJI.map(e => `<button type="button" data-e="${e}">${e}</button>`).join("");
+picker.addEventListener("click", (ev) => {
+  const b = ev.target.closest("button");
+  if (!b) return;
+  const start = textEl.selectionStart || textEl.value.length;
+  const end = textEl.selectionEnd || start;
+  textEl.value = textEl.value.slice(0, start) + b.dataset.e + textEl.value.slice(end);
+  textEl.focus();
+});
+document.getElementById("emoji-btn").onclick = () => picker.classList.toggle("open");
+
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ "&":"&", "<":"<", ">":">", '"':""", "'":"&#39;" }[c]));
+}
+function dayKey(iso) { return (iso || "").slice(0, 10); }
+function clock(iso) {
+  if (!iso) return "";
+  const d = new Date(iso.endsWith("Z") ? iso : iso + "Z");
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleString("ru-RU", { day:"2-digit", month:"short", hour:"2-digit", minute:"2-digit" });
+}
+function mineCall() {
+  return (document.getElementById("callsign").value || "").trim().toUpperCase();
+}
+function draw(list, where) {
+  const frag = document.createDocumentFragment();
+  let prevDay = where === "after" ? logEl.dataset.lastDay || "" : "";
+  for (const m of list) {
+    if (seen.has(m.id)) continue;
+    seen.add(m.id);
+    const day = dayKey(m.created_at);
+    if (day && day !== prevDay) {
+      const label = document.createElement("div");
+      label.className = "day";
+      label.textContent = new Date(day + "T00:00:00Z").toLocaleDateString("ru-RU", { day:"numeric", month:"long", year:"numeric" });
+      frag.appendChild(label);
+      prevDay = day;
+    }
+    const row = document.createElement("div");
+    row.className = "msg" + (m.callsign === mineCall() ? " mine" : "");
+    row.dataset.id = m.id;
+    row.innerHTML = `<div class="bubble"><div class="who">${esc(m.callsign)} · ${esc(m.name)}</div><div class="text">${esc(m.text)}</div><div class="when">${esc(clock(m.created_at))}</div></div>`;
+    frag.appendChild(row);
+  }
+  if (where === "before") {
+    const top = logEl.scrollHeight;
+    logEl.prepend(frag);
+    logEl.scrollTop = logEl.scrollHeight - top;
+  } else {
+    logEl.appendChild(frag);
+    if (stick) logEl.scrollTop = logEl.scrollHeight;
+  }
+  logEl.dataset.lastDay = prevDay;
+  if (list.length) {
+    oldest = oldest ? Math.min(oldest, list[0].id) : list[0].id;
+    newest = Math.max(newest, list[list.length - 1].id);
+  }
+}
+async function load({ before = 0, after = 0 } = {}) {
+  const q = new URLSearchParams({ room, before, after });
+  const res = await fetch("/api/messages?" + q);
+  if (!res.ok) throw new Error("Чат сейчас не открывается");
+  const data = await res.json();
+  return data.messages || [];
+}
+async function openRoom() {
+  logEl.innerHTML = "";
+  seen.clear();
+  oldest = 0;
+  newest = 0;
+  logEl.dataset.lastDay = "";
+  const older = document.createElement("button");
+  older.className = "older";
+  older.textContent = "Показать раньше";
+  older.onclick = async () => {
+    older.disabled = true;
+    const list = await load({ before: oldest || 1 });
+    if (!list.length) older.textContent = "Это самое начало";
+    else draw(list, "before");
+    older.disabled = false;
+  };
+  logEl.appendChild(older);
+  const list = await load();
+  draw(list, "after");
+  stick = true;
+  logEl.scrollTop = logEl.scrollHeight;
+}
+document.querySelectorAll(".rooms button").forEach(btn => {
+  btn.onclick = () => {
+    document.querySelectorAll(".rooms button").forEach(b => b.classList.remove("on"));
+    btn.classList.add("on");
+    room = btn.dataset.room;
+    openRoom().catch(showErr);
+  };
+});
+function showErr(e) { errEl.textContent = e.message || "Не получилось"; }
+async function send() {
+  errEl.textContent = "";
+  const callsign = document.getElementById("callsign").value.trim();
+  const name = document.getElementById("name").value.trim();
+  const text = textEl.value.trim();
+  if (!callsign || !name || !text) { errEl.textContent = "Нужны позывной, имя и текст."; return; }
+  localStorage.setItem("ham-call", callsign.toUpperCase());
+  localStorage.setItem("ham-name", name);
+  const res = await fetch("/api/messages", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ room, callsign, name, text })
+  });
+  const data = await res.json();
+  if (!res.ok) { errEl.textContent = data.error || "Не отправилось"; return; }
+  textEl.value = "";
+  picker.classList.remove("open");
+  stick = true;
+  if (data.message) draw([data.message], "after");
+}
+document.getElementById("send").onclick = () => send().catch(showErr);
+textEl.addEventListener("keydown", (ev) => {
+  if (ev.key === "Enter" && !ev.shiftKey) { ev.preventDefault(); send().catch(showErr); }
+});
+logEl.addEventListener("scroll", () => {
+  stick = logEl.scrollHeight - logEl.scrollTop - logEl.clientHeight < 80;
+});
+setInterval(async () => {
+  if (!newest) return;
+  try {
+    const list = await load({ after: newest });
+    if (list.length) draw(list, "after");
+  } catch (e) {}
+}, 3000);
+openRoom().catch(showErr);
+</script>
+</body>
+</html>
