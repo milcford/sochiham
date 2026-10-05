@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-import hashlib, hmac, json, os, secrets, subprocess, xml.etree.ElementTree as ET
+import hashlib, hmac, json, os, secrets, smtplib, subprocess, xml.etree.ElementTree as ET
+from email.message import EmailMessage
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from urllib.error import HTTPError
 from urllib.parse import parse_qs, urlencode
@@ -49,6 +50,42 @@ def ham_token(callsign):
 
 def ensure_login():
     psql("ALTER TABLE operators ADD COLUMN IF NOT EXISTS password text DEFAULT '';")
+    psql("ALTER TABLE operators ADD COLUMN IF NOT EXISTS email text DEFAULT '';")
+    psql("ALTER TABLE operators ADD COLUMN IF NOT EXISTS reset_token text DEFAULT '';")
+    psql("ALTER TABLE operators ADD COLUMN IF NOT EXISTS reset_until timestamptz;")
+
+def hash_password(password):
+    salt = secrets.token_hex(8)
+    digest = hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), 100000).hex()
+    return f"pbkdf2${salt}${digest}"
+
+def password_ok(stored, given):
+    if not stored:
+        return False
+    if stored.startswith("pbkdf2$"):
+        _, salt, digest = stored.split("$", 2)
+        check = hashlib.pbkdf2_hmac("sha256", given.encode(), salt.encode(), 100000).hex()
+        return hmac.compare_digest(check, digest)
+    return hmac.compare_digest(given.encode(), stored.encode())
+
+def send_mail(to, subject, body):
+    host = os.environ.get("SMTP_HOST", "")
+    if not host:
+        raise RuntimeError("Почта на сервере ещё не настроена.")
+    port = int(os.environ.get("SMTP_PORT", "587"))
+    user = os.environ.get("SMTP_USER", "")
+    password = os.environ.get("SMTP_PASSWORD", "")
+    sender = os.environ.get("SMTP_FROM", user)
+    msg = EmailMessage()
+    msg["From"] = sender
+    msg["To"] = to
+    msg["Subject"] = subject
+    msg.set_content(body)
+    with smtplib.SMTP(host, port, timeout=20) as smtp:
+        smtp.starttls()
+        if user:
+            smtp.login(user, password)
+        smtp.send_message(msg)
 
 def ham_from_cookie(header):
     parts = {}
@@ -62,11 +99,11 @@ def ham_from_cookie(header):
     return ""
 
 def ham_profile(callsign):
-    row = psql(f"SELECT callsign, COALESCE(name,''), COALESCE(password,'') FROM operators WHERE callsign={q(callsign)} LIMIT 1;").strip()
+    row = psql(f"SELECT callsign, COALESCE(name,''), COALESCE(password,''), COALESCE(email,'') FROM operators WHERE callsign={q(callsign)} LIMIT 1;").strip()
     if not row:
         return None
     bits = row.split("|")
-    return {"callsign": bits[0], "name": bits[1] if len(bits)>1 else "", "password": bits[2] if len(bits)>2 else ""}
+    return {"callsign": bits[0], "name": bits[1] if len(bits)>1 else "", "password": bits[2] if len(bits)>2 else "", "email": bits[3] if len(bits)>3 else ""}
 
 def ensure_chat():
     psql("CREATE TABLE IF NOT EXISTS chat_messages (id bigserial PRIMARY KEY, room text NOT NULL, callsign text NOT NULL, name text NOT NULL, body text NOT NULL, created_at timestamptz NOT NULL DEFAULT now());")
@@ -189,19 +226,7 @@ class Handler(SimpleHTTPRequestHandler):
             psql("DELETE FROM contest_logs;")
         else:
             psql(f"DELETE FROM contest_logs WHERE id={int(row_id)};")
-    def enter(self, form):
-        ensure_login()
-        callsign = form.get("callsign", "").strip().upper()
-        password = form.get("password", "")
-        person = ham_profile(callsign)
-        if not person:
-            return self.send_json({"error": "Такого позывного нет. Сначала добавьте себя в список людей."}, 404)
-        if not person["password"]:
-            if len(password) < 4:
-                return self.send_json({"error": "Придумайте пароль, хотя бы 4 знака. Он сохранится за позывным."}, 400)
-            psql(f"UPDATE operators SET password={q(password)} WHERE callsign={q(callsign)};")
-        elif not hmac.compare_digest(password.encode(), person["password"].encode()):
-            return self.send_json({"error": "Неверный пароль."}, 403)
+    def set_ham_cookie(self, callsign):
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
         body = b'{"ok":true}'
@@ -210,6 +235,54 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_header("Set-Cookie", f"ham_call={callsign}; Path=/; Max-Age=2592000")
         self.end_headers()
         self.wfile.write(body)
+    def enter(self, form):
+        ensure_login()
+        callsign = form.get("callsign", "").strip().upper()
+        password = form.get("password", "")
+        person = ham_profile(callsign)
+        if not person or not person["password"] or not password_ok(person["password"], password):
+            return self.send_json({"error": "Неверный позывной или пароль."}, 403)
+        return self.set_ham_cookie(callsign)
+    def register(self, form):
+        ensure_login()
+        callsign = form.get("callsign", "").strip().upper()
+        name = form.get("name", "").strip()[:40]
+        email = form.get("email", "").strip().lower()[:80]
+        password = form.get("password", "")
+        if len(callsign) < 3 or not name or "@" not in email or len(password) < 4:
+            return self.send_json({"error": "Нужны позывной, имя, почта и пароль от 4 знаков."}, 400)
+        if ham_profile(callsign):
+            return self.send_json({"error": "Такой позывной уже есть. Войдите или восстановите пароль."}, 409)
+        taken = psql(f"SELECT callsign FROM operators WHERE lower(email)={q(email)} LIMIT 1;").strip()
+        if taken:
+            return self.send_json({"error": "Эта почта уже занята."}, 409)
+        psql(f"INSERT INTO operators (callsign, name, email, password) VALUES ({q(callsign)}, {q(name)}, {q(email)}, {q(hash_password(password))});")
+        return self.set_ham_cookie(callsign)
+    def forgot(self, form):
+        ensure_login()
+        email = form.get("email", "").strip().lower()
+        row = psql(f"SELECT callsign FROM operators WHERE lower(email)={q(email)} LIMIT 1;").strip()
+        if row:
+            token = secrets.token_urlsafe(24)
+            psql(f"UPDATE operators SET reset_token={q(token)}, reset_until=now()+interval '2 hours' WHERE callsign={q(row)};")
+            host = self.headers.get("Host", "127.0.0.1:8080")
+            link = f"http://{host}/login.html?reset={token}"
+            try:
+                send_mail(email, "Пароль на портале радиолюбителей", "Чтобы задать новый пароль, откройте ссылку:\n\n" + link + "\n\nСсылка живёт два часа.")
+            except Exception as exc:
+                return self.send_json({"error": str(exc)}, 500)
+        return self.send_json({"ok": True})
+    def reset(self, form):
+        ensure_login()
+        token = form.get("token", "")
+        password = form.get("password", "")
+        if len(password) < 4 or not token:
+            return self.send_json({"error": "Нужен новый пароль, хотя бы 4 знака."}, 400)
+        row = psql(f"SELECT callsign FROM operators WHERE reset_token={q(token)} AND reset_until>now() LIMIT 1;").strip()
+        if not row:
+            return self.send_json({"error": "Ссылка устарела. Запросите новую."}, 400)
+        psql(f"UPDATE operators SET password={q(hash_password(password))}, reset_token='', reset_until=NULL WHERE callsign={q(row)};")
+        return self.set_ham_cookie(row)
     def chat_post(self):
         callsign = ham_from_cookie(self.headers.get("Cookie", ""))
         if not callsign:
@@ -239,6 +312,12 @@ class Handler(SimpleHTTPRequestHandler):
         form = self.read_form()
         if path == "/api/enter":
             return self.enter(form)
+        if path == "/api/register":
+            return self.register(form)
+        if path == "/api/forgot":
+            return self.forgot(form)
+        if path == "/api/reset":
+            return self.reset(form)
         if path == "/api/logs/delete":
             if not self.cookie_ok(): return self.send_json({"error": "auth"}, 401)
             try:

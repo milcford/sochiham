@@ -7,40 +7,101 @@
 <style>
   body { margin:0; font-family: "Segoe UI", system-ui, sans-serif; background:#faf7f4; color:#1c1917; }
   main { max-width:480px; margin:0 auto; padding:24px 16px; }
-  form, .card { background:#fff; border-radius:16px; padding:16px; }
+  form, .card { background:#fff; border-radius:16px; padding:16px; margin-top:12px; }
   input { width:100%; box-sizing:border-box; padding:12px; margin:8px 0; font-size:16px; border:1px solid #e7e5e4; border-radius:12px; }
-  button { width:100%; background:#e85d04; color:#fff; border:0; border-radius:12px; padding:14px; font-size:18px; font-weight:700; }
+  button { width:100%; background:#e85d04; color:#fff; border:0; border-radius:12px; padding:14px; font-size:18px; font-weight:700; cursor:pointer; }
+  nav { display:flex; gap:8px; flex-wrap:wrap; }
+  nav button { width:auto; background:#fff; color:#1c1917; border:1px solid #e7e5e4; border-radius:999px; padding:8px 12px; font-size:16px; }
+  nav button.on { background:#e85d04; color:#fff; border-color:#e85d04; }
   a { color:#e85d04; }
   .err { color:#b91c1c; }
   .ok { color:#1b7a3a; }
+  .hide { display:none; }
 </style>
 </head>
 <body>
 <main>
   <p><a href="index.html">На портал</a></p>
-  <h1>Вход</h1>
-  <p>Позывной, как в списке людей. Если пароля ещё не было, придумайте его: он сохранится за этим позывным.</p>
-  <form id="enter">
-    <input name="callsign" placeholder="Позывной" required maxlength="12" autocomplete="username">
-    <input name="password" type="password" placeholder="Пароль" required maxlength="40" autocomplete="current-password">
+  <h1>Свой вход</h1>
+  <p id="who" class="ok"></p>
+  <nav>
+    <button type="button" class="on" data-tab="login">Вход</button>
+    <button type="button" data-tab="reg">Регистрация</button>
+    <button type="button" data-tab="forgot">Забыли пароль</button>
+  </nav>
+
+  <form id="login">
+    <input name="callsign" placeholder="Позывной" required maxlength="12">
+    <input name="password" type="password" placeholder="Пароль" required maxlength="40">
     <button>Войти</button>
-    <p class="err" id="err"></p>
+    <p class="err"></p>
   </form>
-  <p class="ok" id="who"></p>
-  <p><a href="lyudi.html">Меня ещё нет в списке</a></p>
+
+  <form id="reg" class="hide">
+    <input name="callsign" placeholder="Позывной" required maxlength="12">
+    <input name="name" placeholder="Имя" required maxlength="40">
+    <input name="email" type="email" placeholder="Почта для восстановления" required maxlength="80">
+    <input name="password" type="password" placeholder="Пароль, от 4 знаков" required maxlength="40">
+    <button>Зарегистрироваться</button>
+    <p class="err"></p>
+  </form>
+
+  <form id="forgot" class="hide">
+    <input name="email" type="email" placeholder="Почта, указанная при регистрации" required maxlength="80">
+    <button>Прислать ссылку</button>
+    <p class="err"></p>
+    <p class="ok"></p>
+  </form>
+
+  <form id="reset" class="hide">
+    <input name="password" type="password" placeholder="Новый пароль" required maxlength="40">
+    <button>Сохранить пароль</button>
+    <p class="err"></p>
+  </form>
 </main>
 <script>
-const err = document.getElementById("err");
+const params = new URLSearchParams(location.search);
+const token = params.get("reset") || "";
+function show(name) {
+  ["login","reg","forgot","reset"].forEach(id => document.getElementById(id).classList.toggle("hide", id !== name));
+  document.querySelectorAll("nav button").forEach(b => b.classList.toggle("on", b.dataset.tab === name));
+}
+document.querySelectorAll("nav button").forEach(b => b.onclick = () => show(b.dataset.tab));
+if (token) show("reset");
 fetch("/api/me").then(r => r.json()).then(me => {
-  if (me.callsign) document.getElementById("who").textContent = "Сейчас вы вошли как " + me.callsign + " " + (me.name || "");
+  if (me.callsign) document.getElementById("who").textContent = "Сейчас вы вошли как " + me.callsign + (me.name ? " · " + me.name : "");
 });
-document.getElementById("enter").onsubmit = async (e) => {
-  e.preventDefault();
-  err.textContent = "";
-  const body = new URLSearchParams(new FormData(e.target));
-  const res = await fetch("/api/enter", { method: "POST", body });
+async function post(url, form) {
+  const err = form.querySelector(".err");
+  const ok = form.querySelector(".ok");
+  if (err) err.textContent = "";
+  if (ok) ok.textContent = "";
+  const res = await fetch(url, { method: "POST", body: new URLSearchParams(new FormData(form)) });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) { err.textContent = data.error || "Не пустило"; return; }
+  if (!res.ok) { if (err) err.textContent = data.error || "Не получилось"; return; }
+  return data;
+}
+document.getElementById("login").onsubmit = async (e) => {
+  e.preventDefault();
+  if (await post("/api/enter", e.target)) location.href = "chat.html";
+};
+document.getElementById("reg").onsubmit = async (e) => {
+  e.preventDefault();
+  if (await post("/api/register", e.target)) location.href = "chat.html";
+};
+document.getElementById("forgot").onsubmit = async (e) => {
+  e.preventDefault();
+  const data = await post("/api/forgot", e.target);
+  if (data) e.target.querySelector(".ok").textContent = "Если такая почта есть, письмо со ссылкой уже отправлено.";
+};
+document.getElementById("reset").onsubmit = async (e) => {
+  e.preventDefault();
+  const body = new URLSearchParams(new FormData(e.target));
+  body.set("token", token);
+  const err = e.target.querySelector(".err");
+  const res = await fetch("/api/reset", { method: "POST", body });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) { err.textContent = data.error || "Ссылка не подошла"; return; }
   location.href = "chat.html";
 };
 </script>
