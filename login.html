@@ -74,12 +74,26 @@ fetch("/api/me").then(r => r.json()).then(me => {
 async function post(url, form) {
   const err = form.querySelector(".err");
   const ok = form.querySelector(".ok");
+  const button = form.querySelector("button");
   if (err) err.textContent = "";
   if (ok) ok.textContent = "";
-  const res = await fetch(url, { method: "POST", body: new URLSearchParams(new FormData(form)) });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) { if (err) err.textContent = data.error || "Не получилось"; return; }
-  return data;
+  button.disabled = true;
+  button.dataset.old = button.textContent;
+  button.textContent = "Секунду...";
+  try {
+    const res = await fetch(url, { method: "POST", body: new URLSearchParams(new FormData(form)) });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      if (err) err.textContent = data.error || (res.status === 404 ? "Сервер ещё старый. На нём нужен git pull и перезапуск." : "Не получилось");
+      return;
+    }
+    return data;
+  } catch (e) {
+    if (err) err.textContent = "Сервер не ответил. Проверьте, что python3 portal.py запущен.";
+  } finally {
+    button.disabled = false;
+    button.textContent = button.dataset.old;
+  }
 }
 document.getElementById("login").onsubmit = async (e) => {
   e.preventDefault();

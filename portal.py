@@ -310,14 +310,14 @@ class Handler(SimpleHTTPRequestHandler):
         if path == "/api/messages":
             return self.chat_post()
         form = self.read_form()
-        if path == "/api/enter":
-            return self.enter(form)
-        if path == "/api/register":
-            return self.register(form)
-        if path == "/api/forgot":
-            return self.forgot(form)
-        if path == "/api/reset":
-            return self.reset(form)
+        if path in ("/api/enter", "/api/register", "/api/forgot", "/api/reset"):
+            try:
+                if path == "/api/enter": return self.enter(form)
+                if path == "/api/register": return self.register(form)
+                if path == "/api/forgot": return self.forgot(form)
+                return self.reset(form)
+            except Exception as exc:
+                return self.send_json({"error": str(exc) or "ошибка сервера"}, 500)
         if path == "/api/logs/delete":
             if not self.cookie_ok(): return self.send_json({"error": "auth"}, 401)
             try:
