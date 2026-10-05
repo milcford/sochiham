@@ -16,7 +16,7 @@
   nav button.on { background:var(--orange); color:#fff; border-color:var(--orange); }
   main { max-width:980px; margin:0 auto; padding:16px; }
   .card { background:var(--card); border-radius:16px; padding:16px; margin-bottom:12px; box-shadow:0 1px 2px rgba(0,0,0,.04); }
-  .card > b { display:block; margin:0 0 14px; font-size:22px; }
+  .card > b { display:block; margin:0 0 10px; font-size:20px; }
   .when { display:flex; justify-content:space-between; align-items:center; }
   .when h1 { margin:0; font-size:28px; }
   .mhz { color:var(--orange); font-weight:800; font-size:22px; margin:4px 0 0; }
@@ -27,7 +27,9 @@
   button.big, a.big { display:block; width:100%; border:0; background:var(--orange); color:#fff; font-size:18px; font-weight:700; border-radius:14px; padding:14px; margin:8px 0; cursor:pointer; text-align:center; text-decoration:none; box-sizing:border-box; }
   button.ghost, a.ghost { background:#fff; color:var(--orange); border:2px solid var(--orange); }
   .row { display:flex; justify-content:space-between; gap:12px; padding:10px 0; border-bottom:1px solid #f5f5f4; }
-  #people-list { margin-bottom: 8px; }
+  .person { display:flex; gap:18px; align-items:baseline; padding:5px 0; border-bottom:1px solid #f5f5f4; }
+  .person b { min-width:92px; }
+  #people-list { margin-bottom: 6px; }
   .grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
   .shot, .video-card { background:#fff; border-radius:16px; overflow:hidden; box-shadow:0 1px 2px rgba(0,0,0,.05); margin-bottom:12px; }
   .shot img, .video-card img { width:100%; height:180px; object-fit:cover; display:block; background:#eee; }
@@ -115,7 +117,7 @@ async function round(){
 async function people(){
   try {
     const rows=await fetch('/api/calls').then(r=>r.json());
-    document.getElementById('people-list').innerHTML=rows.map(p=>'<div class="row"><b>'+p.callsign+'</b><span>'+(p.name||'')+'</span></div>').join('')||'<div class="row"><span>пока никого нет</span></div>';
+    document.getElementById('people-list').innerHTML=rows.map(p=>'<div class="person"><b>'+p.callsign+'</b><span>'+(p.name||'')+'</span></div>').join('')||'<div class="row"><span>пока никого нет</span></div>';
   } catch(e) {
     document.getElementById('people-list').innerHTML='<div class="row"><span>список не открылся</span></div>';
   }
