@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import hashlib, hmac, json, os, secrets, smtplib, subprocess, xml.etree.ElementTree as ET
-from email.message import EmailMessage
+from email.header import Header
+from email.mime.text import MIMEText
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from urllib.error import HTTPError
 from urllib.parse import parse_qs, urlencode
@@ -80,16 +81,17 @@ def send_mail(to, subject, body):
     user = os.environ.get("SMTP_USER", "")
     password = os.environ.get("SMTP_PASSWORD", "")
     sender = os.environ.get("SMTP_FROM", user)
-    msg = EmailMessage()
+    msg = MIMEText(body, "plain", "utf-8")
     msg["From"] = sender
     msg["To"] = to
-    msg["Subject"] = subject
-    msg.set_content(body, charset="utf-8")
+    msg["Subject"] = Header(subject, "utf-8")
     with smtplib.SMTP(host, port, timeout=20) as smtp:
+        smtp.ehlo()
         smtp.starttls()
+        smtp.ehlo()
         if user:
             smtp.login(user, password)
-        smtp.sendmail(sender, [to], msg.as_bytes())
+        smtp.sendmail(sender, [to], msg.as_string())
 
 def ham_from_cookie(header):
     parts = {}
