@@ -45,6 +45,23 @@
   .hide { display:none; }
   footer { text-align:center; color:#8a938c; padding:8px 16px 28px; font-size:13px; }
   h2 { font-size:20px; font-weight:650; }
+
+  .hero { background:#1f3d32; color:#fff; border-radius:16px; padding:28px 24px; margin-bottom:16px; }
+  .hero h1 { margin:0 0 8px; font-size:32px; font-weight:680; }
+  .hero p { margin:0; font-size:17px; line-height:1.45; max-width:46ch; }
+  .facts { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:16px; }
+  .fact { background:#fff; border:1px solid var(--line); border-radius:12px; padding:16px; }
+  .fact b { display:block; font-size:20px; margin-bottom:4px; }
+  .fact span { color:var(--muted); font-size:14px; }
+  .home-grid { display:grid; grid-template-columns:1.3fr .7fr; gap:12px; }
+  .links { display:flex; flex-direction:column; gap:8px; }
+  .links a { display:block; background:#fff; border:1px solid var(--line); border-radius:12px; padding:14px 16px; text-decoration:none; color:var(--ink); font-weight:650; }
+  .links a span { display:block; color:var(--muted); font-weight:500; font-size:13px; margin-top:2px; }
+  .years { margin:0; padding:0; list-style:none; }
+  .years li { display:grid; grid-template-columns:72px 1fr; gap:10px; padding:8px 0; border-bottom:1px solid #f0f2f0; }
+  .years b { color:var(--accent); }
+  @media (max-width:720px) { .facts, .home-grid { grid-template-columns:1fr; } .hero h1 { font-size:26px; } }
+
   .viewer { position:fixed; inset:0; background:rgba(10,12,11,.92); z-index:30; display:flex; align-items:center; justify-content:center; }
   .viewer.hide { display:none; }
   .viewer img { max-width:84vw; max-height:82vh; object-fit:contain; }
@@ -75,23 +92,35 @@
 </header>
 <main>
   <section id="home">
-    <div class="card">
-      <b>Радиолюбители Сочи</b>
-      <p>Портал для своих и для тех, кто выходит с нами в эфир. Сочи здесь корень, двери открыты радиолюбителям откуда угодно.</p>
-      <p>Воскресный круглый стол — в 9:00 на 145.525 МГц. Кто говорит и очередь — во вкладке «Эфир».</p>
+    <div class="hero">
+      <h1>Радиолюбители Сочи</h1>
+      <p>Круглый стол по воскресеньям в 9:00 на 145.525 МГц. Сочи здесь корень, заходить можно откуда угодно.</p>
     </div>
-    <div class="card">
-      <b>Откуда это пошло</b>
-      <p>В Сочи радиолюбительство держалось и до клубов в интернете. В 1993 году сошёлся Си-Би клуб «Российское Радио»: Дмитрий, Сергей, Игорь, Анатолий и Александр. Из первых букв имён вышел местный позывной ADIS. Выезжали на Большой Ахун, ставили антенны и репитеры. Вызывной канал Си-Би у них был 18-й, 27.175 МГц.</p>
-      <p>Клуб радиолюбителей Сочи собрался 6 ноября 2011. Коллективная станция RA6AWI 23 декабря 2012 снова вышла в эфир после долгой тишины. В Лазаревском с 2013 работает клуб «Дельфины», в городе — «Нептун».</p>
+    <div class="facts">
+      <div class="fact"><b>145.525</b><span>воскресенье, 9:00</span></div>
+      <div class="fact"><b>RA6AWI</b><span>коллективная станция клуба</span></div>
+      <div class="fact"><b>26 сентября</b><span>слёт в «Белых ночах»</span></div>
+    </div>
+    <div class="home-grid">
+      <div class="card">
+        <b>Как это собиралось</b>
+        <ul class="years">
+          <li><b>1993</b><span>Си-Би клуб «Российское Радио». Из имён Дмитрия, Сергея, Игоря, Анатолия и Александра сложился местный позывной ADIS. Выезжали на Большой Ахун.</span></li>
+          <li><b>2011</b><span>6 ноября собрался Клуб радиолюбителей Сочи.</span></li>
+          <li><b>2012</b><span>23 декабря RA6AWI снова вышла в эфир после долгой тишины.</span></li>
+          <li><b>2013</b><span>В Лазаревском — клуб «Дельфины», в городе позже — «Нептун».</span></li>
+        </ul>
+      </div>
+      <div class="links">
+        <a href="#" onclick="document.querySelector('[data-tab=air]').click();return false;">Эфир<span>кто говорит и очередь</span></a>
+        <a href="#" onclick="document.querySelector('[data-tab=photo]').click();return false;">Фото слёта<span>26 сентября 2026</span></a>
+        <a href="chat.html">Чат<span>с архивом сообщений</span></a>
+        <a href="#" onclick="document.querySelector('[data-tab=people]').click();return false;">Люди<span>позывные и города</span></a>
+      </div>
     </div>
     <div class="card">
       <b>Дипломы, которые уже были</b>
-      <p>«Сочи Олимпийский» — к Играм 2014. «Многонациональный Сочи» — диплом клуба, страница на qrz.ru. Были дни активности и серия «Достопримечательности Сочи». Старые условия здесь для памяти, не как действующий регламент.</p>
-    </div>
-    <div class="card">
-      <b>Что есть на портале</b>
-      <p>Люди и кабинет, чат с архивом, фото и видео, объявления, табло круглого стола и подсчёт Кубка. Слушать эфир с сайта — позже.</p>
+      <p>«Сочи Олимпийский» — к Играм 2014. «Многонациональный Сочи» — диплом клуба. Были дни активности и серия «Достопримечательности Сочи». Это память, не действующий регламент.</p>
     </div>
   </section>
   <section id="air" class="hide">
