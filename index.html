@@ -52,7 +52,8 @@
   <div class="top"><div><b>Радиолюбители Сочи</b><span class="sub">145.525 МГц · воскресенье 9:00</span></div>
   <a class="user" id="login-link" href="login.html">Войти<span>кабинет</span></a></div>
   <nav>
-    <button class="on" data-tab="home">Эфир</button>
+    <button class="on" data-tab="home">Главная</button>
+    <button data-tab="air">Эфир</button>
     <button data-tab="people">Люди</button>
     <button data-tab="photo">Фото</button>
     <button data-tab="video">Видео</button>
@@ -64,6 +65,26 @@
 </header>
 <main>
   <section id="home">
+    <div class="card">
+      <b>Радиолюбители Сочи</b>
+      <p>Портал для своих и для тех, кто выходит с нами в эфир. Сочи здесь корень, двери открыты радиолюбителям откуда угодно.</p>
+      <p>Воскресный круглый стол — в 9:00 на 145.525 МГц. Кто говорит и очередь — во вкладке «Эфир».</p>
+    </div>
+    <div class="card">
+      <b>Откуда это пошло</b>
+      <p>В Сочи радиолюбительство держалось и до клубов в интернете. В 1993 году сошёлся Си-Би клуб «Российское Радио»: Дмитрий, Сергей, Игорь, Анатолий и Александр. Из первых букв имён вышел местный позывной ADIS. Выезжали на Большой Ахун, ставили антенны и репитеры. Вызывной канал Си-Би у них был 18-й, 27.175 МГц.</p>
+      <p>Клуб радиолюбителей Сочи собрался 6 ноября 2011. Коллективная станция RA6AWI 23 декабря 2012 снова вышла в эфир после долгой тишины. В Лазаревском с 2013 работает клуб «Дельфины», в городе — «Нептун».</p>
+    </div>
+    <div class="card">
+      <b>Дипломы, которые уже были</b>
+      <p>«Сочи Олимпийский» — к Играм 2014. «Многонациональный Сочи» — диплом клуба, страница на qrz.ru. Были дни активности и серия «Достопримечательности Сочи». Старые условия здесь для памяти, не как действующий регламент.</p>
+    </div>
+    <div class="card">
+      <b>Что есть на портале</b>
+      <p>Люди и кабинет, чат с архивом, фото и видео, объявления, табло круглого стола и подсчёт Кубка. Слушать эфир с сайта — позже.</p>
+    </div>
+  </section>
+  <section id="air" class="hide">
     <div class="card when"><div><h1>Воскресный круглый стол</h1><p class="mhz">9:00 · 145.525 МГц</p></div></div>
     <div class="live"><small>Сейчас говорит</small><strong id="now-call">Никто</strong><em id="now-name"></em><div id="host"></div></div>
     <div class="card">
@@ -107,7 +128,7 @@
 </main>
 <footer>Пробная страница клуба.</footer>
 <script>
-document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{document.querySelectorAll("nav button").forEach(x=>x.classList.remove("on")); b.classList.add("on"); ["home","people","photo","video","ads"].forEach(id=>document.getElementById(id).classList.toggle("hide", id!==b.dataset.tab));});
+document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{document.querySelectorAll("nav button").forEach(x=>x.classList.remove("on")); b.classList.add("on"); ["home","air","people","photo","video","ads"].forEach(id=>document.getElementById(id).classList.toggle("hide", id!==b.dataset.tab));});
 function addAd(e){e.preventDefault(); const el=document.createElement("div"); el.className="card"; el.innerHTML="<b>"+document.getElementById("kind").value+" "+document.getElementById("what").value+"</b><p>"+(document.getElementById("where").value||"без района")+"</p>"; document.getElementById("adlist").prepend(el); e.target.reset();}
 async function round(){
   try {
