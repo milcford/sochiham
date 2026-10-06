@@ -282,6 +282,22 @@ def drop_removed_videos(old, new):
         if path.is_file():
             path.unlink()
 
+
+ADS_FILE = Path(__file__).resolve().parent / "data" / "ads.json"
+
+def load_ads():
+    if not ADS_FILE.exists():
+        return []
+    try:
+        data = json.loads(ADS_FILE.read_text(encoding="utf-8"))
+        return data if isinstance(data, list) else []
+    except Exception:
+        return []
+
+def save_ads(items):
+    ADS_FILE.parent.mkdir(exist_ok=True)
+    ADS_FILE.write_text(json.dumps(items, ensure_ascii=False, indent=2), encoding="utf-8")
+
 class Handler(SimpleHTTPRequestHandler):
     def end_headers(self):
         path = self.path.split("?", 1)[0]
@@ -313,6 +329,8 @@ class Handler(SimpleHTTPRequestHandler):
             return self.send_json(load_album())
         if path == "/api/videos":
             return self.send_json(load_videos())
+        if path == "/api/ads":
+            return self.send_json(load_ads())
         if path == "/api/round":
             return self.send_json(round_view())
         if path == "/api/logout":
@@ -486,10 +504,54 @@ class Handler(SimpleHTTPRequestHandler):
         saved = save_album(data)
         drop_removed_photos(old, saved)
         return self.send_json(saved)
+
+    def ads_post(self):
+        call = ham_from_cookie(self.headers.get("Cookie", ""))
+        if not call:
+            return self.send_json({"error": "Сначала войдите по позывному."}, 401)
+        person = profile_view(call) or {"callsign": call, "name": call, "phone": "", "show_phone": False}
+        form = self.read_form()
+        kind = form.get("kind", "Продаю").strip()[:20]
+        if kind not in ("Продаю", "Куплю", "Отдам"):
+            kind = "Продаю"
+        what = form.get("what", "").strip()[:120]
+        where = form.get("where", "").strip()[:40]
+        if not what:
+            return self.send_json({"error": "Напишите, что именно."}, 400)
+        phone = person.get("phone") if person.get("show_phone") else ""
+        name = " ".join(x for x in [person.get("name") or "", person.get("surname") or ""] if x)
+        items = load_ads()
+        items.insert(0, {
+            "id": int(__import__("time").time()),
+            "kind": kind,
+            "what": what,
+            "where": where,
+            "callsign": call,
+            "name": name,
+            "phone": phone or "",
+        })
+        save_ads(items[:200])
+        return self.send_json({"ok": True, "ads": load_ads()})
+    def ads_delete(self):
+        call = ham_from_cookie(self.headers.get("Cookie", ""))
+        if not call:
+            return self.send_json({"error": "Сначала войдите."}, 401)
+        qs = parse_qs(self.path.split("?", 1)[-1])
+        try:
+            ad_id = int((qs.get("id") or ["0"])[0])
+        except ValueError:
+            return self.send_json({"error": "Нет объявления."}, 400)
+        items = [a for a in load_ads() if not (int(a.get("id") or 0) == ad_id and (a.get("callsign") == call or self.cookie_ok()))]
+        save_ads(items)
+        return self.send_json({"ok": True, "ads": items})
     def do_POST(self):
         path = self.path.split("?", 1)[0]
         if path == "/api/messages":
             return self.chat_post()
+        if path == "/api/ads":
+            return self.ads_post()
+        if path == "/api/ads/delete":
+            return self.ads_delete()
         if path == "/api/admin/photos":
             return self.photos_save()
         if path == "/api/admin/videos":

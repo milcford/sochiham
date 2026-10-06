@@ -144,13 +144,12 @@
   </section>
   <section id="ads" class="hide">
     <h2>Объявления</h2>
-    <div class="card"><b>Продаю трансивер</b><p>Адлер · 25 000 ₽ · самовывоз</p></div>
-    <div class="card"><b>Отдам кабель</b><p>Сочи · писать по позывному</p></div>
-    <form class="card" onsubmit="addAd(event)">
+    <form class="card" id="ad-form" onsubmit="addAd(event)">
       <select id="kind"><option>Продаю</option><option>Куплю</option><option>Отдам</option></select>
       <input id="what" placeholder="Что именно" required>
       <input id="where" placeholder="Район или город">
       <button class="big">Добавить</button>
+      <p id="ad-err"></p>
     </form>
     <div id="adlist"></div>
   </section>
@@ -165,7 +164,31 @@
 </div>
 <script>
 document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{document.querySelectorAll("nav button").forEach(x=>x.classList.remove("on")); b.classList.add("on"); ["home","air","people","photo","video","ads"].forEach(id=>document.getElementById(id).classList.toggle("hide", id!==b.dataset.tab));});
-function addAd(e){e.preventDefault(); const el=document.createElement("div"); el.className="card"; el.innerHTML="<b>"+document.getElementById("kind").value+" "+document.getElementById("what").value+"</b><p>"+(document.getElementById("where").value||"без района")+"</p>"; document.getElementById("adlist").prepend(el); e.target.reset();}
+let meCall="";
+function adCard(a){
+  const who=(a.callsign||"")+(a.name?" · "+a.name:"");
+  const contact=a.phone?("Телефон: "+a.phone):("Писать по позывному "+(a.callsign||""));
+  const del=meCall && meCall===a.callsign?' <button type="button" class="big ghost" onclick="delAd('+a.id+')">Снять</button>':"";
+  return '<div class="card"><b>'+a.kind+" "+a.what+'</b><p>'+(a.where||"")+'</p><p>Разместил: '+who+'<br>'+contact+'</p>'+del+'</div>';
+}
+async function loadAds(){
+  const rows=await fetch("/api/ads").then(r=>r.json());
+  document.getElementById("adlist").innerHTML=(rows||[]).map(adCard).join("")||"<p>Пока нет объявлений</p>";
+}
+async function addAd(e){
+  e.preventDefault();
+  document.getElementById("ad-err").textContent="";
+  const res=await fetch("/api/ads",{method:"POST", body:new URLSearchParams(new FormData(e.target))});
+  const data=await res.json();
+  if(!res.ok){ document.getElementById("ad-err").textContent=data.error||"Не добавилось"; return; }
+  e.target.reset();
+  loadAds();
+}
+async function delAd(id){
+  await fetch("/api/ads/delete?id="+id,{method:"POST"});
+  loadAds();
+}
+loadAds();
 async function round(){
   try {
     const data=await fetch('/api/round').then(r=>r.json());
@@ -229,6 +252,7 @@ fetch("/api/me").then(r=>r.json()).then(me=>{
   const link=document.getElementById("login-link");
   if(!link) return;
   if(!me.callsign){ link.href="login.html"; link.innerHTML="Войти<span>в свой кабинет</span>"; return; }
+  meCall=me.callsign; loadAds();
   link.href="profile.html";
   link.innerHTML=me.callsign+"<span>"+(me.name||"кабинет")+"</span>";
 }).catch(()=>{});
