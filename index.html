@@ -103,7 +103,7 @@
   <section id="photo" class="hide">
     <h2 id="photo-title">Фото</h2>
     <p id="photo-sub"></p>
-    <div class="card" id="photo-note"></div>
+    <div class="card hide" id="photo-note"></div>
     <div class="grid" id="album"></div>
   </section>
   <section id="video" class="hide">
@@ -152,15 +152,22 @@ round(); people(); setInterval(round, 5000);
 async function album(){
   const box=document.getElementById("album");
   if(!box) return;
-  try{
-    const data=await fetch("/api/photos").then(r=>r.json());
-    document.getElementById("photo-title").textContent=data.title||"Фото";
-    document.getElementById("photo-sub").textContent=data.subtitle||"";
-    const note=document.getElementById("photo-note");
-    note.innerHTML=data.note?("<p>"+data.note+"</p>"):"";
-    note.classList.toggle("hide", !data.note);
-    box.innerHTML=(data.items||[]).map(p=>'<div class="shot"><a href="'+p.file+'" target="_blank"><img src="'+p.file+'" alt=""></a><p>'+(p.title||"")+'</p></div>').join("")||"<p>Пока нет фото</p>";
-  }catch(e){ box.innerHTML="<p>Фото не открылись</p>"; }
+  let data=null;
+  for (const url of ["/api/photos","/data/photos.json"]){
+    try{
+      const res=await fetch(url);
+      if(!res.ok) continue;
+      const body=await res.json();
+      if(body && body.items){ data=body; break; }
+    }catch(e){}
+  }
+  if(!data){ box.innerHTML="<p>Список фото не открылся. На сервере: git pull, затем заново python3 portal.py</p>"; return; }
+  document.getElementById("photo-title").textContent=data.title||"Фото";
+  document.getElementById("photo-sub").textContent=data.subtitle||"";
+  const note=document.getElementById("photo-note");
+  note.innerHTML=data.note?("<p>"+data.note+"</p>"):"";
+  note.classList.toggle("hide", !data.note);
+  box.innerHTML=(data.items||[]).map(p=>'<div class="shot"><a href="'+p.file+'" target="_blank"><img src="'+p.file+'" alt=""></a><p>'+(p.title||"")+'</p></div>').join("")||"<p>Пока нет фото</p>";
 }
 album();
 
