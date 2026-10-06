@@ -66,6 +66,7 @@ def ensure_login():
         ("phone", "text DEFAULT ''"),
         ("about", "text DEFAULT ''"),
         ("birth_year", "integer"),
+        ("birth_date", "date"),
         ("show_phone", "boolean DEFAULT false"),
         ("show_birth", "boolean DEFAULT false"),
     ):
@@ -80,7 +81,7 @@ def profile_view(callsign):
       COALESCE(NULLIF(a.locator,''), o.locator, ''),
       COALESCE(NULLIF(a.phone,''), o.phone, ''),
       COALESCE(NULLIF(a.about,''), o.about, ''),
-      COALESCE(a.birth_year::text, ''),
+      COALESCE(a.birth_date::text, ''),
       CASE WHEN a.show_phone THEN '1' ELSE '' END,
       CASE WHEN a.show_birth THEN '1' ELSE '' END
       FROM site_accounts a
@@ -89,7 +90,7 @@ def profile_view(callsign):
     if not row:
         return None
     bits = row.split("|")
-    keys = ["callsign","name","email","surname","patronymic","city","locator","phone","about","birth_year","show_phone","show_birth"]
+    keys = ["callsign","name","email","surname","patronymic","city","locator","phone","about","birth_date","show_phone","show_birth"]
     data = dict(zip(keys, bits + [""]*len(keys)))
     data["show_phone"] = bool(data["show_phone"])
     data["show_birth"] = bool(data["show_birth"])
@@ -389,18 +390,32 @@ class Handler(SimpleHTTPRequestHandler):
             locator = form.get("locator", "").strip().upper()[:6]
             phone = form.get("phone", "").strip()[:20]
             about = form.get("about", "").strip()[:300]
-            year = form.get("birth_year", "").strip()
+            birth = form.get("birth_date", "").strip()
             show_phone = "true" if form.get("show_phone") else "false"
             show_birth = "true" if form.get("show_birth") else "false"
             if not name or "@" not in email:
                 return self.send_json({"error": "Нужны имя и почта."}, 400)
-            if year and (not year.isdigit() or not 1920 <= int(year) <= 2020):
-                return self.send_json({"error": "Год рождения: число от 1920 до 2020."}, 400)
+            year_sql = "NULL"
+            date_sql = "NULL"
+            if birth:
+                parts = birth.replace("/", ".").replace("-", ".").split(".")
+                if len(parts)==3 and len(parts[0])==4:
+                    birth = f"{parts[0]}-{parts[1]}-{parts[2]}"
+                elif len(parts)==3:
+                    birth = f"{parts[2]}-{parts[1]}-{parts[0]}"
+                try:
+                    y, m, d = [int(x) for x in birth.split("-")]
+                    if not 1920 <= y <= 2020:
+                        raise ValueError
+                except Exception:
+                    return self.send_json({"error": "Дата рождения: день, месяц и год, например 15.04.1970."}, 400)
+                year_sql = str(y)
+                date_sql = q(f"{y:04d}-{m:02d}-{d:02d}")
             taken = psql(f"SELECT callsign FROM site_accounts WHERE lower(email)={q(email)} AND callsign<>{q(call)} LIMIT 1;").strip()
             if taken:
                 return self.send_json({"error": "Эта почта уже занята."}, 409)
             year_sql = str(int(year)) if year else "NULL"
-            psql(f"""UPDATE site_accounts SET name={q(name)}, email={q(email)}, surname={q(surname)}, patronymic={q(patronymic)}, city={q(city)}, locator={q(locator)}, phone={q(phone)}, about={q(about)}, birth_year={year_sql}, show_phone={show_phone}, show_birth={show_birth} WHERE callsign={q(call)};""")
+            psql(f"""UPDATE site_accounts SET name={q(name)}, email={q(email)}, surname={q(surname)}, patronymic={q(patronymic)}, city={q(city)}, locator={q(locator)}, phone={q(phone)}, about={q(about)}, birth_year={year_sql}, birth_date={date_sql}, show_phone={show_phone}, show_birth={show_birth} WHERE callsign={q(call)};""")
             psql(f"""UPDATE operators SET name={q(name)}, surname={q(surname)}, patronymic={q(patronymic)}, city={q(city)}, locator={q(locator)}, phone={q(phone)}, about={q(about)} WHERE callsign={q(call)};""")
             return self.send_json({"ok": True})
         if path in ("/api/enter", "/api/register", "/api/forgot", "/api/reset"):

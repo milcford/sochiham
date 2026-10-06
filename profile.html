@@ -34,7 +34,7 @@
     <input name="city" id="city" placeholder="Город">
     <select name="locator" id="locator"><option value="">Локатор</option></select>
     <input name="phone" id="phone" placeholder="Телефон">
-    <input name="birth_year" id="birth_year" inputmode="numeric" placeholder="Год рождения" maxlength="4">
+    <input name="birth_date" id="birth_date" type="date" min="1920-01-01" max="2020-12-31" title="Дата рождения">
     <input name="email" id="email" type="email" placeholder="Почта" required>
     <textarea name="about" id="about" rows="3" placeholder="Коротко о себе"></textarea>
     <label><input type="checkbox" name="show_phone" id="show_phone" style="width:auto"> Показывать телефон всем</label>
@@ -47,7 +47,7 @@
   <a class="btn ghost" href="/api/logout">Выйти</a>
 </main>
 <script>
-const fields = ["surname","name","patronymic","city","locator","phone","birth_year","email","about"];
+const fields = ["surname","name","patronymic","city","locator","phone","birth_date","email","about"];
 function line(title, value){ return value ? '<div class="row"><span>'+title+'</span><b>'+value+'</b></div>' : ''; }
 fetch("/api/me").then(r=>r.json()).then(async me=>{
   if(!me.callsign){ location.href="login.html"; return; }
@@ -63,7 +63,7 @@ fetch("/api/me").then(r=>r.json()).then(async me=>{
   document.getElementById("card").innerHTML =
     line("Имя", [me.surname, me.name, me.patronymic].filter(Boolean).join(" ")) +
     line("Город", me.city) + line("Локатор", me.locator) +
-    line("Телефон", me.phone) + line("Год рождения", me.birth_year) +
+    line("Телефон", me.phone) + line("Дата рождения", me.birth_date ? me.birth_date.split("-").reverse().join(".") : "") +
     line("Почта", me.email) + line("О себе", me.about);
 });
 document.getElementById("edit").onsubmit = async (e) => {
