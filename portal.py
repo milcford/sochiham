@@ -505,12 +505,31 @@ class Handler(SimpleHTTPRequestHandler):
         drop_removed_photos(old, saved)
         return self.send_json(saved)
 
+    def read_ad_form(self):
+        length = int(self.headers.get("Content-Length", "0"))
+        raw = self.rfile.read(min(length, 8_000_000))
+        ctype = self.headers.get("Content-Type", "")
+        if "multipart/form-data" not in ctype:
+            return {k: v[0] for k, v in parse_qs(raw.decode()).items()}, b""
+        boundary = ctype.split("boundary=")[-1].strip().encode()
+        fields, photo = {}, b""
+        for part in raw.split(b"--" + boundary):
+            if b"Content-Disposition" not in part:
+                continue
+            head, _, body = part.partition(b"\r\n\r\n")
+            body = body.rsplit(b"\r\n", 1)[0]
+            name = head.split(b'name="')[-1].split(b'"')[0].decode()
+            if b"filename=" in head and body:
+                photo = body
+            else:
+                fields[name] = body.decode(errors="replace")
+        return fields, photo
     def ads_post(self):
         call = ham_from_cookie(self.headers.get("Cookie", ""))
         if not call:
             return self.send_json({"error": "Сначала войдите по позывному."}, 401)
         person = profile_view(call) or {"callsign": call, "name": call, "phone": "", "show_phone": False}
-        form = self.read_form()
+        form, photo = self.read_ad_form()
         kind = form.get("kind", "Продаю").strip()[:20]
         if kind not in ("Продаю", "Куплю", "Отдам"):
             kind = "Продаю"
@@ -521,15 +540,26 @@ class Handler(SimpleHTTPRequestHandler):
         phone = person.get("phone") if person.get("show_phone") else ""
         name = " ".join(x for x in [person.get("name") or "", person.get("surname") or ""] if x)
         items = load_ads()
-        items.insert(0, {
-            "id": int(__import__("time").time()),
-            "kind": kind,
-            "what": what,
-            "where": where,
-            "callsign": call,
-            "name": name,
-            "phone": phone or "",
-        })
+        try:
+            edit_id = int(form.get("id") or 0)
+        except ValueError:
+            edit_id = 0
+        found = next((a for a in items if int(a.get("id") or 0) == edit_id), None)
+        if found:
+            if found.get("callsign") != call and not self.cookie_ok():
+                return self.send_json({"error": "Это чужое объявление."}, 403)
+            found["kind"], found["what"], found["where"] = kind, what, where
+            found["name"], found["phone"] = name, phone or ""
+            ad_id = found["id"]
+        else:
+            ad_id = int(__import__("time").time())
+            items.insert(0, {"id": ad_id, "kind": kind, "what": what, "where": where, "callsign": call, "name": name, "phone": phone or "", "photo": ""})
+            found = items[0]
+        if photo and len(photo) > 100:
+            folder = Path(__file__).resolve().parent / "ads"
+            folder.mkdir(exist_ok=True)
+            (folder / f"{ad_id}.jpg").write_bytes(photo)
+            found["photo"] = f"ads/{ad_id}.jpg"
         save_ads(items[:200])
         return self.send_json({"ok": True, "ads": load_ads()})
     def ads_delete(self):
@@ -541,9 +571,16 @@ class Handler(SimpleHTTPRequestHandler):
             ad_id = int((qs.get("id") or ["0"])[0])
         except ValueError:
             return self.send_json({"error": "Нет объявления."}, 400)
-        items = [a for a in load_ads() if not (int(a.get("id") or 0) == ad_id and (a.get("callsign") == call or self.cookie_ok()))]
-        save_ads(items)
-        return self.send_json({"ok": True, "ads": items})
+        keep = []
+        for a in load_ads():
+            if int(a.get("id") or 0) == ad_id and (a.get("callsign") == call or self.cookie_ok()):
+                photo = Path(__file__).resolve().parent / str(a.get("photo") or "")
+                if a.get("photo") and photo.is_file():
+                    photo.unlink()
+                continue
+            keep.append(a)
+        save_ads(keep)
+        return self.send_json({"ok": True, "ads": keep})
     def do_POST(self):
         path = self.path.split("?", 1)[0]
         if path == "/api/messages":

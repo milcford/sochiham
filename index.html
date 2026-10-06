@@ -145,10 +145,12 @@
   <section id="ads" class="hide">
     <h2>Объявления</h2>
     <form class="card" id="ad-form" onsubmit="addAd(event)">
+      <input type="hidden" name="id" id="ad-id">
       <select id="kind" name="kind"><option>Продаю</option><option>Куплю</option><option>Отдам</option></select>
       <input id="what" name="what" placeholder="Что именно" required>
       <input id="where" name="where" placeholder="Район или город">
-      <button class="big">Добавить</button>
+      <input name="photo" type="file" accept="image/*">
+      <button class="big" id="ad-btn">Добавить</button>
       <p id="ad-err"></p>
     </form>
     <div id="adlist"></div>
@@ -168,20 +170,34 @@ let meCall="";
 function adCard(a){
   const who=(a.callsign||"")+(a.name?" · "+a.name:"");
   const contact=a.phone?("Телефон: "+a.phone):("Писать по позывному "+(a.callsign||""));
-  const del=meCall && meCall===a.callsign?' <button type="button" class="big ghost" onclick="delAd('+a.id+')">Снять</button>':"";
-  return '<div class="card"><b>'+a.kind+" "+a.what+'</b><p>'+(a.where||"")+'</p><p>Разместил: '+who+'<br>'+contact+'</p>'+del+'</div>';
+  const img=a.photo?'<img src="'+a.photo+'" alt="" style="width:100%;border-radius:10px;margin-bottom:8px">':"";
+  const own=meCall && meCall===a.callsign;
+  const actions=own?'<button type="button" class="big ghost" onclick="editAd('+a.id+')">Исправить</button><button type="button" class="big ghost" onclick="delAd('+a.id+')">Снять</button>':"";
+  return '<div class="card">'+img+'<b>'+a.kind+" "+a.what+'</b><p>'+(a.where||"")+'</p><p>Разместил: '+who+'<br>'+contact+'</p>'+actions+'</div>';
+}
+let adRows=[];
+function editAd(id){
+  const a=adRows.find(x=>x.id===id);
+  if(!a) return;
+  document.getElementById("ad-id").value=a.id;
+  document.getElementById("kind").value=a.kind;
+  document.getElementById("what").value=a.what;
+  document.getElementById("where").value=a.where||"";
+  document.getElementById("ad-btn").textContent="Сохранить";
+  window.scrollTo(0,0);
 }
 async function loadAds(){
-  const rows=await fetch("/api/ads").then(r=>r.json());
-  document.getElementById("adlist").innerHTML=(rows||[]).map(adCard).join("")||"<p>Пока нет объявлений</p>";
+  adRows=await fetch("/api/ads").then(r=>r.json());
+  document.getElementById("adlist").innerHTML=(adRows||[]).map(adCard).join("")||"<p>Пока нет объявлений</p>";
 }
 async function addAd(e){
   e.preventDefault();
   document.getElementById("ad-err").textContent="";
-  const res=await fetch("/api/ads",{method:"POST", body:new URLSearchParams(new FormData(e.target))});
+  const res=await fetch("/api/ads",{method:"POST", body:new FormData(e.target)});
   const data=await res.json();
   if(!res.ok){ document.getElementById("ad-err").textContent=data.error||"Не добавилось"; return; }
   e.target.reset();
+  document.getElementById("ad-btn").textContent="Добавить";
   loadAds();
 }
 async function delAd(id){
