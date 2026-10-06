@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Кабинет — радиолюбители Сочи</title>
+<style>
+  body { margin:0; font-family:"Segoe UI", system-ui, sans-serif; background:#faf7f4; color:#1c1917; }
+  main { max-width:560px; margin:0 auto; padding:24px 16px; }
+  .card { background:#fff; border-radius:16px; padding:16px; margin:12px 0; }
+  input { width:100%; box-sizing:border-box; padding:12px; margin:8px 0; font-size:16px; border:1px solid #e7e5e4; border-radius:12px; }
+  button, a.btn { display:block; width:100%; box-sizing:border-box; text-align:center; text-decoration:none; background:#e85d04; color:#fff; border:0; border-radius:12px; padding:14px; font-size:18px; font-weight:700; margin-top:8px; }
+  a.ghost { background:#fff; color:#e85d04; border:2px solid #e85d04; }
+  a { color:#e85d04; }
+  .call { font-size:28px; font-weight:800; margin:0; }
+  .err { color:#b91c1c; }
+  .ok { color:#1b7a3a; }
+</style>
+</head>
+<body>
+<main>
+  <p><a href="index.html">На портал</a></p>
+  <h1>Кабинет</h1>
+  <div class="card">
+    <p class="call" id="call">...</p>
+    <p id="hint">Здесь ваши данные для входа и чата.</p>
+  </div>
+  <form class="card" id="edit">
+    <input name="name" id="name" placeholder="Имя" required maxlength="40">
+    <input name="email" id="email" type="email" placeholder="Почта" required maxlength="80">
+    <button>Сохранить</button>
+    <p class="err" id="err"></p>
+    <p class="ok" id="ok"></p>
+  </form>
+  <a class="btn" href="chat.html">Открыть чат</a>
+  <a class="btn ghost" href="/api/logout">Выйти</a>
+</main>
+<script>
+const err = document.getElementById("err");
+fetch("/api/me").then(r=>r.json()).then(me=>{
+  if(!me.callsign){ location.href="login.html"; return; }
+  document.getElementById("call").textContent = me.callsign;
+  document.getElementById("name").value = me.name || "";
+  document.getElementById("email").value = me.email || "";
+});
+document.getElementById("edit").onsubmit = async (e) => {
+  e.preventDefault();
+  err.textContent = "";
+  document.getElementById("ok").textContent = "";
+  const res = await fetch("/api/profile", { method:"POST", body:new URLSearchParams(new FormData(e.target)) });
+  const data = await res.json().catch(()=>({}));
+  if(!res.ok){ err.textContent = data.error || "Не сохранилось"; return; }
+  document.getElementById("ok").textContent = "Сохранено";
+};
+</script>
+</body>
+</html>

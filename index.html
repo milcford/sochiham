@@ -9,6 +9,8 @@
   * { box-sizing: border-box; }
   body { margin:0; font-family: "Segoe UI", system-ui, sans-serif; background:var(--bg); color:var(--ink); }
   header { background:#fff; border-bottom:3px solid var(--orange); padding:14px 18px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:5; gap:12px; }
+  .user { font-size:14px; color:#1b7a3a; font-weight:700; white-space:nowrap; text-decoration:none; }
+  .user span { display:block; color:#78716c; font-weight:500; font-size:12px; }
   header b { font-size:18px; }
   header span { color:var(--muted); font-size:13px; display:block; }
   nav { display:flex; gap:8px; flex-wrap:wrap; }
@@ -52,12 +54,11 @@
     <button data-tab="video">Видео</button>
     <button data-tab="ads">Объявления</button>
     <a href="chat.html">Чат</a>
-    <a href="login.html" id="login-link">Войти</a>
     <a href="kubok.html">Кубок</a>
     <a href="vedushchiy.html">Ведущему</a>
   </nav>
+  <a class="user" id="login-link" href="login.html">Войти<span>в свой кабинет</span></a>
 </header>
-<div id="who" style="max-width:980px;margin:12px auto 0;padding:0 16px;color:#1b7a3a;font-weight:700"></div>
 <main>
   <section id="home">
     <div class="card when"><div><h1>Воскресенье, 9:00</h1><p class="mhz">145.525 МГц</p></div><div style="font-size:42px">📻</div></div>
@@ -128,15 +129,10 @@ async function people(){
 round(); people(); setInterval(round, 5000);
 fetch("/api/me").then(r=>r.json()).then(me=>{
   const link=document.getElementById("login-link");
-  const who=document.getElementById("who");
-  if(!link||!who) return;
-  if(!me.callsign){ who.textContent=""; link.textContent="Войти"; return; }
-  link.textContent=me.callsign;
-  link.href="login.html";
-  link.style.background="#1b7a3a";
-  link.style.color="#fff";
-  link.style.borderColor="#1b7a3a";
-  who.innerHTML="Вы вошли как "+me.callsign+(me.name?" · "+me.name:"")+' · <a href="/api/logout">Выйти</a>';
+  if(!link) return;
+  if(!me.callsign){ link.href="login.html"; link.innerHTML="Войти<span>в свой кабинет</span>"; return; }
+  link.href="profile.html";
+  link.innerHTML=me.callsign+"<span>"+(me.name||"кабинет")+"</span>";
 }).catch(()=>{});
 </script>
 </body>
