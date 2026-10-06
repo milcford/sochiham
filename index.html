@@ -5,49 +5,51 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Сочи — радиолюбители</title>
 <style>
-  :root { --orange:#c2410c; --green:#1f6b45; --ink:#1c1917; --muted:#78716c; --bg:#f4efe8; --card:#fff; }
-  * { box-sizing: border-box; }
+  :root { --ink:#1a1f1c; --muted:#5e6a62; --line:#e4e7e4; --bg:#f6f7f6; --card:#fff; --accent:#1f6b45; }
+  * { box-sizing:border-box; }
   body { margin:0; font-family: "Segoe UI", system-ui, sans-serif; background:var(--bg); color:var(--ink); }
-  header { background:#1f3d32; color:#fff; padding:16px 22px 0; }
-  .top { display:flex; justify-content:space-between; align-items:flex-end; gap:16px; }
-  header b { font-size:22px; letter-spacing:.2px; }
-  header .sub { color:#d6d3d1; font-size:14px; display:block; margin-top:2px; }
-  .user { color:#fff; text-decoration:none; text-align:right; font-weight:800; }
-  .user span { display:block; color:#d6d3d1; font-weight:500; font-size:12px; }
-  nav { display:flex; gap:4px; flex-wrap:wrap; margin-top:14px; }
-  nav button, nav a { border:0; background:transparent; color:#e7e5e4; border-radius:12px 12px 0 0; padding:10px 14px; font-weight:650; cursor:pointer; text-decoration:none; font-size:16px; }
-  nav button.on, nav a:hover, nav button:hover { background:#f4efe8; color:#1c1917; }
-  main { max-width:860px; margin:0 auto; padding:22px 16px 40px; }
-  .card { background:var(--card); border-radius:18px; padding:18px; margin-bottom:14px; box-shadow:0 8px 24px rgba(60,40,20,.05); }
-  .card > b { display:block; margin:0 0 10px; font-size:18px; }
-  .when { display:flex; justify-content:space-between; align-items:center; background:#fffaf5; border:1px solid #f0e4d6; }
-  .when h1 { margin:0; font-size:30px; }
-  .mhz { color:var(--orange); font-weight:800; font-size:26px; margin:6px 0 0; letter-spacing:.3px; }
-  .live { background:var(--green); color:#fff; border-radius:18px; padding:20px; margin-bottom:14px; }
-  .live small { opacity:.85; font-size:15px; }
-  .live strong { display:block; font-size:34px; margin-top:4px; }
-  .live em { font-style:normal; font-size:18px; opacity:.9; }
-  button.big, a.big { display:block; width:100%; border:0; background:var(--orange); color:#fff; font-size:18px; font-weight:700; border-radius:14px; padding:14px; margin:8px 0; cursor:pointer; text-align:center; text-decoration:none; }
-  a.line { display:block; text-align:center; color:var(--orange); font-weight:700; text-decoration:none; border:1px solid #f0d2c2; border-radius:14px; padding:12px; }
-  .row, .person { display:flex; justify-content:space-between; gap:12px; padding:8px 0; border-bottom:1px solid #f5f5f4; }
+  header { background:#fff; border-bottom:1px solid var(--line); padding:0 28px; position:sticky; top:0; z-index:5; }
+  .top { display:flex; justify-content:space-between; align-items:center; height:64px; }
+  header b { font-size:18px; font-weight:700; }
+  header .sub { color:var(--muted); font-size:13px; margin-left:10px; font-weight:500; }
+  .user { color:var(--accent); text-decoration:none; text-align:right; font-weight:700; font-size:14px; }
+  .user span { display:block; color:var(--muted); font-weight:500; font-size:12px; }
+  nav { display:flex; gap:2px; }
+  nav button, nav a { border:0; background:transparent; color:var(--muted); padding:12px 14px; font-weight:600; cursor:pointer; text-decoration:none; font-size:15px; border-bottom:2px solid transparent; border-radius:0; }
+  nav button.on { color:var(--ink); border-bottom-color:var(--accent); }
+  nav a:hover, nav button:hover { color:var(--ink); }
+  main { max-width:880px; margin:0 auto; padding:28px 16px 48px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:20px; margin-bottom:16px; }
+  .card > b { display:block; margin:0 0 12px; font-size:16px; }
+  .when { display:flex; justify-content:space-between; align-items:flex-end; }
+  .when h1 { margin:0; font-size:28px; font-weight:650; }
+  .mhz { color:var(--accent); font-weight:700; font-size:20px; margin:8px 0 0; }
+  .live { background:#1f3d32; color:#fff; border-radius:12px; padding:22px; margin-bottom:16px; }
+  .live small { opacity:.75; font-size:13px; letter-spacing:.04em; text-transform:uppercase; }
+  .live strong { display:block; font-size:32px; margin-top:6px; font-weight:650; }
+  .live em { font-style:normal; font-size:16px; opacity:.85; }
+  button.big, a.big { display:block; width:100%; border:0; background:var(--accent); color:#fff; font-size:16px; font-weight:650; border-radius:10px; padding:12px; margin:8px 0; cursor:pointer; text-align:center; text-decoration:none; }
+  a.big.ghost, button.big.ghost { background:#fff; color:var(--accent); border:1px solid #cfe0d6; }
+  .row, .person { display:flex; justify-content:space-between; gap:12px; padding:8px 0; border-bottom:1px solid #f0f2f0; }
   .person { display:grid; grid-template-columns:92px 1.2fr 1.4fr 70px 150px 60px; gap:8px; align-items:baseline; }
   .person b { min-width:0; }
-  .person span { color:#57534e; }
-  .heads { color:#a8a29e; font-size:13px; }
-  #people-list { margin-bottom: 6px; }
+  .person span { color:#4b5560; }
+  .heads { color:#8a938c; font-size:12px; text-transform:uppercase; letter-spacing:.04em; }
+  #people-list { margin-bottom:6px; }
   .grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
-  .shot, .video-card { background:#fff; border-radius:16px; overflow:hidden; box-shadow:0 1px 2px rgba(0,0,0,.04); }
+  .shot, .video-card { background:#fff; border:1px solid var(--line); border-radius:12px; overflow:hidden; }
   .shot img, .video-card video { width:100%; display:block; aspect-ratio:4/3; object-fit:cover; background:#eee; }
-  .shot p, .video-card p { margin:8px 10px 12px; }
-  form input, form textarea, form select { width:100%; box-sizing:border-box; padding:12px; margin:6px 0; border:1px solid #e7e5e4; border-radius:12px; font:inherit; }
+  .shot p, .video-card p { margin:8px 12px 12px; }
+  form input, form textarea, form select { width:100%; box-sizing:border-box; padding:12px; margin:6px 0; border:1px solid var(--line); border-radius:10px; font:inherit; }
   .hide { display:none; }
-  footer { text-align:center; color:#a8a29e; padding:8px 16px 28px; }
-  @media (max-width:720px) { .person { grid-template-columns:1fr 1fr; } .grid { grid-template-columns:1fr; } }
+  footer { text-align:center; color:#8a938c; padding:8px 16px 28px; font-size:13px; }
+  h2 { font-size:20px; font-weight:650; }
+  @media (max-width:720px) { .person { grid-template-columns:1fr 1fr; } .grid { grid-template-columns:1fr; } header { padding:0 12px; } }
 </style>
 </head>
 <body>
 <header>
-  <div class="top"><div><b>Радиолюбители Сочи</b><span class="sub">Круглый стол, люди, чат</span></div>
+  <div class="top"><div><b>Радиолюбители Сочи</b><span class="sub">145.525 МГц · воскресенье 9:00</span></div>
   <a class="user" id="login-link" href="login.html">Войти<span>кабинет</span></a></div>
   <nav>
     <button class="on" data-tab="home">Эфир</button>
@@ -62,7 +64,7 @@
 </header>
 <main>
   <section id="home">
-    <div class="card when"><div><h1>Воскресенье, 9:00</h1><p class="mhz">145.525 МГц</p></div><div style="font-size:42px">📻</div></div>
+    <div class="card when"><div><h1>Воскресный круглый стол</h1><p class="mhz">9:00 · 145.525 МГц</p></div></div>
     <div class="live"><small>Сейчас говорит</small><strong id="now-call">Никто</strong><em id="now-name"></em><div id="host"></div></div>
     <div class="card">
       <b>Очередь</b>
