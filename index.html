@@ -144,7 +144,8 @@
   </section>
   <section id="ads" class="hide">
     <h2>Объявления</h2>
-    <form class="card" id="ad-form" onsubmit="addAd(event)">
+    <div class="card" id="ad-login"><p>Авторизуйтесь, чтобы разместить объявление.</p><a class="big" href="login.html">Войти</a></div>
+    <form class="card hide" id="ad-form" onsubmit="addAd(event)">
       <input type="hidden" name="id" id="ad-id">
       <select id="kind" name="kind"><option>Продаю</option><option>Куплю</option><option>Отдам</option></select>
       <input id="what" name="what" placeholder="Что именно" required>
@@ -269,6 +270,8 @@ fetch("/api/me").then(r=>r.json()).then(me=>{
   if(!link) return;
   if(!me.callsign){ link.href="login.html"; link.innerHTML="Войти<span>в свой кабинет</span>"; return; }
   meCall=me.callsign; loadAds();
+  document.getElementById("ad-form").classList.remove("hide");
+  document.getElementById("ad-login").classList.add("hide");
   link.href="profile.html";
   link.innerHTML=me.callsign+"<span>"+(me.name||"кабинет")+"</span>";
 }).catch(()=>{});
