@@ -39,11 +39,21 @@
   .grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
   .shot, .video-card { background:#fff; border:1px solid var(--line); border-radius:12px; overflow:hidden; }
   .shot img, .video-card video { width:100%; display:block; aspect-ratio:4/3; object-fit:cover; background:#eee; }
+  .shot button { width:100%; padding:0; margin:0; border:0; background:transparent; cursor:pointer; border-radius:0; }
   .shot p, .video-card p { margin:8px 12px 12px; }
   form input, form textarea, form select { width:100%; box-sizing:border-box; padding:12px; margin:6px 0; border:1px solid var(--line); border-radius:10px; font:inherit; }
   .hide { display:none; }
   footer { text-align:center; color:#8a938c; padding:8px 16px 28px; font-size:13px; }
   h2 { font-size:20px; font-weight:650; }
+  .viewer { position:fixed; inset:0; background:rgba(10,12,11,.92); z-index:30; display:flex; align-items:center; justify-content:center; }
+  .viewer.hide { display:none; }
+  .viewer img { max-width:84vw; max-height:82vh; object-fit:contain; }
+  .viewer button { position:absolute; width:auto; background:transparent; color:#fff; border:0; cursor:pointer; font-size:48px; line-height:1; padding:8px 16px; }
+  .viewer .vx { top:10px; right:12px; font-size:16px; font-weight:650; }
+  .viewer .vprev { left:4px; }
+  .viewer .vnext { right:4px; }
+  #view-cap { position:absolute; left:0; right:0; bottom:18px; text-align:center; color:#fff; margin:0; }
+
   @media (max-width:720px) { .person { grid-template-columns:1fr 1fr; } .grid { grid-template-columns:1fr; } header { padding:0 12px; } }
 </style>
 </head>
@@ -127,6 +137,13 @@
   </section>
 </main>
 <footer>Пробная страница клуба.</footer>
+<div id="viewer" class="viewer hide">
+  <button type="button" class="vx" onclick="closeView()">Закрыть</button>
+  <button type="button" class="vprev" onclick="stepView(-1)">‹</button>
+  <img id="view-img" alt="">
+  <button type="button" class="vnext" onclick="stepView(1)">›</button>
+  <p id="view-cap"></p>
+</div>
 <script>
 document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{document.querySelectorAll("nav button").forEach(x=>x.classList.remove("on")); b.classList.add("on"); ["home","air","people","photo","video","ads"].forEach(id=>document.getElementById(id).classList.toggle("hide", id!==b.dataset.tab));});
 function addAd(e){e.preventDefault(); const el=document.createElement("div"); el.className="card"; el.innerHTML="<b>"+document.getElementById("kind").value+" "+document.getElementById("what").value+"</b><p>"+(document.getElementById("where").value||"без района")+"</p>"; document.getElementById("adlist").prepend(el); e.target.reset();}
@@ -167,9 +184,16 @@ async function album(){
   const note=document.getElementById("photo-note");
   note.innerHTML=data.note?("<p>"+data.note+"</p>"):"";
   note.classList.toggle("hide", !data.note);
-  box.innerHTML=(data.items||[]).map(p=>'<div class="shot"><a href="'+p.file+'" target="_blank"><img src="'+p.file+'" alt=""></a><p>'+(p.title||"")+'</p></div>').join("")||"<p>Пока нет фото</p>";
+  shots=data.items||[];
+    box.innerHTML=shots.map((p,i)=>'<div class="shot"><button type="button" onclick="openView('+i+')"><img src="'+p.file+'" alt=""></button><p>'+(p.title||"")+'</p></div>').join("")||"<p>Пока нет фото</p>";
 }
 album();
+let shots=[];
+let shotAt=0;
+function openView(i){ if(!shots.length) return; shotAt=(i+shots.length)%shots.length; const s=shots[shotAt]; document.getElementById("view-img").src=s.file; document.getElementById("view-cap").textContent=(s.title||"")+" · "+(shotAt+1)+" / "+shots.length; document.getElementById("viewer").classList.remove("hide"); }
+function closeView(){ document.getElementById("viewer").classList.add("hide"); }
+function stepView(d){ openView(shotAt+d); }
+document.addEventListener("keydown", e=>{ const v=document.getElementById("viewer"); if(!v || v.classList.contains("hide")) return; if(e.key==="Escape") closeView(); if(e.key==="ArrowLeft") stepView(-1); if(e.key==="ArrowRight") stepView(1); });
 
 fetch("/api/me").then(r=>r.json()).then(me=>{
   const link=document.getElementById("login-link");
