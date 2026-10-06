@@ -30,7 +30,10 @@
   button.ghost, a.ghost { background:#fff; color:var(--orange); border:2px solid var(--orange); }
   .row { display:flex; justify-content:space-between; gap:12px; padding:10px 0; border-bottom:1px solid #f5f5f4; }
   .person { display:flex; gap:18px; align-items:baseline; padding:5px 0; border-bottom:1px solid #f5f5f4; }
-  .person b { min-width:92px; }
+  .person { display:grid; grid-template-columns:92px 1.2fr 1.4fr 70px 150px 60px; gap:8px; align-items:baseline; }
+  .person b { min-width:0; }
+  .person span { color:#57534e; }
+  .heads { color:#a8a29e; font-size:13px; }
   #people-list { margin-bottom: 6px; }
   .grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
   .shot, .video-card { background:#fff; border-radius:16px; overflow:hidden; box-shadow:0 1px 2px rgba(0,0,0,.05); margin-bottom:12px; }
@@ -121,7 +124,7 @@ async function round(){
 async function people(){
   try {
     const rows=await fetch('/api/calls').then(r=>r.json());
-    document.getElementById('people-list').innerHTML=rows.map(p=>'<div class="person"><b>'+p.callsign+'</b><span>'+[p.name,p.city,p.locator,p.phone,p.birth_year].filter(Boolean).join(' · ')+'</span></div>').join('')||'<div class="row"><span>пока никого нет</span></div>';
+    document.getElementById('people-list').innerHTML='<div class="person heads"><b>Позывной</b><span>Имя</span><span>Город</span><span>Локатор</span><span>Телефон</span><span>Год</span></div>'+rows.map(p=>'<div class="person"><b>'+p.callsign+'</b><span>'+(p.name||'')+'</span><span>'+(p.city||'')+'</span><span>'+(p.locator||'')+'</span><span>'+(p.phone||'')+'</span><span>'+(p.birth_year||'')+'</span></div>').join('')||'<div class="row"><span>пока никого нет</span></div>';
   } catch(e) {
     document.getElementById('people-list').innerHTML='<div class="row"><span>список не открылся</span></div>';
   }
