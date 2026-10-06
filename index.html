@@ -101,17 +101,20 @@
     </div>
   </section>
   <section id="photo" class="hide">
-    <h2>Фото</h2>
-    <div class="grid">
-      <div class="shot"><div class="ph">📷</div><p>Антенна на крыше<br><small>положите img/antenna1.jpg</small></p></div>
-      <div class="shot"><div class="ph">📷</div><p>Яги на 2 метра<br><small>положите img/antenna2.jpg</small></p></div>
-      <div class="shot"><div class="ph">📷</div><p>Трансивер<br><small>положите img/radio.jpg</small></p></div>
+    <h2>Слёт радиолюбителей Большого Сочи</h2>
+    <p>26 сентября 2026 · санаторий «Белые ночи»</p>
+    <div class="card">
+      <b>Кто на общем снимке</b>
+      <p>RV6BEU, UD6AXG, UD6AVX, UA6BRA, RV6AOL, RW6AER, R6DYE, UA6ARR, UD6HWS, RQ7C, RG7A, R6DZM, R6DQK, RN6AJ, R6DKO, R6ADW. Если позывной подписан неверно — поправьте.</p>
     </div>
+    <div class="grid" id="album"></div>
   </section>
   <section id="video" class="hide">
-    <h2>Видео</h2>
-    <div class="video-card"><div class="ph">▶</div><p>Круглый стол<br><small>файл video/stol.mp4</small></p></div>
-    <video controls poster=""><source src="video/stol.mp4" type="video/mp4"></video>
+    <h2>Видео со слёта</h2>
+    <p>26 сентября 2026 · «Белые ночи»</p>
+    <div class="video-card"><video controls preload="metadata"><source src="video/slet-2026-09-26/01.mp4" type="video/mp4"></video><p>Ролик 1</p></div>
+    <div class="video-card"><video controls preload="metadata"><source src="video/slet-2026-09-26/02.mp4" type="video/mp4"></video><p>Ролик 2</p></div>
+    <div class="video-card"><video controls preload="metadata"><source src="video/slet-2026-09-26/03.mp4" type="video/mp4"></video><p>Ролик 3</p></div>
   </section>
   <section id="ads" class="hide">
     <h2>Объявления</h2>
@@ -148,6 +151,18 @@ async function people(){
   }
 }
 round(); people(); setInterval(round, 5000);
+
+const album=document.getElementById("album");
+if(album){
+  const labeled='<div class="shot"><a href="photos/slet-2026-09-26/labeled.jpg" target="_blank"><img src="photos/slet-2026-09-26/labeled.jpg" alt="общий снимок с позывными"></a><p>Общий снимок с позывными</p></div>';
+  let html=labeled;
+  for(let n=1;n<=61;n++){
+    const name=String(n).padStart(2,"0")+".jpg";
+    html+='<div class="shot"><a href="photos/slet-2026-09-26/'+name+'" target="_blank"><img src="photos/slet-2026-09-26/'+name+'" alt="слёт '+n+'"></a><p>Снимок '+n+'</p></div>';
+  }
+  album.innerHTML=html;
+}
+
 fetch("/api/me").then(r=>r.json()).then(me=>{
   const link=document.getElementById("login-link");
   if(!link) return;
