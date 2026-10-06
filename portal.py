@@ -202,7 +202,7 @@ class Handler(SimpleHTTPRequestHandler):
             if not call:
                 return self.send_json({"callsign": ""})
             person = ham_profile(call) or {"callsign": call, "name": ""}
-            return self.send_json({"callsign": person["callsign"], "name": person["name"]})
+            return self.send_json({"callsign": person["callsign"], "name": person["name"], "email": person.get("email","")})
         if path == "/api/messages":
             if not ham_from_cookie(self.headers.get("Cookie", "")):
                 return self.send_json({"error": "Сначала войдите по позывному."}, 401)
@@ -336,6 +336,20 @@ class Handler(SimpleHTTPRequestHandler):
         if path == "/api/messages":
             return self.chat_post()
         form = self.read_form()
+        if path == "/api/profile":
+            call = ham_from_cookie(self.headers.get("Cookie", ""))
+            if not call:
+                return self.send_json({"error": "Сначала войдите."}, 401)
+            name = form.get("name", "").strip()[:40]
+            email = form.get("email", "").strip().lower()[:80]
+            if not name or "@" not in email:
+                return self.send_json({"error": "Нужны имя и почта."}, 400)
+            taken = psql(f"SELECT callsign FROM site_accounts WHERE lower(email)={q(email)} AND callsign<>{q(call)} LIMIT 1;").strip()
+            if taken:
+                return self.send_json({"error": "Эта почта уже занята."}, 409)
+            psql(f"UPDATE site_accounts SET name={q(name)}, email={q(email)} WHERE callsign={q(call)};")
+            psql(f"UPDATE operators SET name={q(name)} WHERE callsign={q(call)};")
+            return self.send_json({"ok": True})
         if path in ("/api/enter", "/api/register", "/api/forgot", "/api/reset"):
             try:
                 if path == "/api/enter": return self.enter(form)
