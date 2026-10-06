@@ -198,6 +198,50 @@ def qrz_lookup(call):
     phone = tag_text(data, "phone") or tag_text(data, "tel") or tag_text(data, "telephone")
     return {"callsign": tag_text(data, "call") or call, "surname": tag_text(data, "surname"), "name": tag_text(data, "name"), "patronymic": tag_text(data, "name2"), "city": tag_text(data, "city").rstrip(","), "locator": grid[:4].upper(), "phone": phone}
 
+
+PHOTOS_FILE = Path(__file__).resolve().parent / "data" / "photos.json"
+
+def load_album():
+    if PHOTOS_FILE.exists():
+        try:
+            data = json.loads(PHOTOS_FILE.read_text(encoding="utf-8"))
+            if isinstance(data.get("items"), list):
+                return data
+        except Exception:
+            pass
+    return {"title": "Фото", "subtitle": "", "note": "", "items": []}
+
+def save_album(data):
+    PHOTOS_FILE.parent.mkdir(exist_ok=True)
+    clean = []
+    for item in data.get("items") or []:
+        file = str(item.get("file") or "").replace("\\", "/").lstrip("/")
+        if not file.startswith("photos/") or ".." in file:
+            continue
+        path = Path(__file__).resolve().parent / file
+        if not path.is_file():
+            continue
+        clean.append({"file": file, "title": str(item.get("title") or "Снимок")[:80]})
+    out = {
+        "title": str(data.get("title") or "Фото")[:80],
+        "subtitle": str(data.get("subtitle") or "")[:120],
+        "note": str(data.get("note") or "")[:500],
+        "items": clean,
+    }
+    PHOTOS_FILE.write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8")
+    return out
+
+def drop_removed_photos(old, new):
+    keep = {item["file"] for item in new.get("items") or []}
+    root = Path(__file__).resolve().parent
+    for item in old.get("items") or []:
+        file = item.get("file") or ""
+        if file in keep or not file.startswith("photos/") or ".." in file:
+            continue
+        path = root / file
+        if path.is_file():
+            path.unlink()
+
 class Handler(SimpleHTTPRequestHandler):
     def end_headers(self):
         path = self.path.split("?", 1)[0]
@@ -225,6 +269,8 @@ class Handler(SimpleHTTPRequestHandler):
         path = self.path.split("?", 1)[0]
         if path in ("/admin", "/admin/"):
             return self.send_html(ADMIN_PAGE)
+        if path == "/api/photos":
+            return self.send_json(load_album())
         if path == "/api/round":
             return self.send_json(round_view())
         if path == "/api/logout":
@@ -372,10 +418,25 @@ class Handler(SimpleHTTPRequestHandler):
         psql(f"INSERT INTO chat_messages (room, callsign, name, body) VALUES ({q(room)}, {q(callsign)}, {q(name)}, {q(text)});")
         row = psql("SELECT row_to_json(t)::text FROM (SELECT id, room, callsign, name, body AS text, to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS created_at FROM chat_messages ORDER BY id DESC LIMIT 1) t;")
         return self.send_json({"message": json.loads(row.strip())})
+    def photos_save(self):
+        if not self.cookie_ok():
+            return self.send_json({"error": "auth"}, 401)
+        length = int(self.headers.get("Content-Length", "0"))
+        raw = self.rfile.read(min(length, 200000))
+        try:
+            data = json.loads(raw.decode() or "{}")
+        except Exception:
+            return self.send_json({"error": "Не разобрал список фото."}, 400)
+        old = load_album()
+        saved = save_album(data)
+        drop_removed_photos(old, saved)
+        return self.send_json(saved)
     def do_POST(self):
         path = self.path.split("?", 1)[0]
         if path == "/api/messages":
             return self.chat_post()
+        if path == "/api/admin/photos":
+            return self.photos_save()
         form = self.read_form()
         if path == "/api/profile":
             call = ham_from_cookie(self.headers.get("Cookie", ""))
@@ -507,17 +568,17 @@ ADMIN_PAGE = r'''<!DOCTYPE html><html lang=ru><head><meta charset=utf-8><meta na
 <body><main><p><a href="index.html">На портал</a></p><h1>Админка</h1>
 <form id=login><input name=password type=password placeholder="Пароль админки" required><button>Войти</button><p class=err id=login-err></p></form>
 <div id=app hidden>
-<nav><button type=button class=on data-tab=people>Люди</button><button type=button data-tab=host>Ведущий</button><button type=button data-tab=logs>Связи</button></nav>
+<nav><button type=button class=on data-tab=people>Люди</button><button type=button data-tab=host>Ведущий</button><button type=button data-tab=logs>Связи</button><button type=button data-tab=photos>Фото</button></nav>
 <section id=people><form id=edit><input name=id type=hidden><input name=phone type=hidden><input name=callsign placeholder=Позывной required><button class=ghost type=button onclick=lookup()>Найти на qrz.ru</button><p class=err id=qrz-err></p><input name=surname placeholder=Фамилия><input name=name placeholder=Имя required><input name=patronymic placeholder="Отчество, если есть"><input name=city placeholder=Город><select name=locator id=locator><option value="">Локатор</option></select><p class=hint>Телефон</p><div class=phone><select id=code><option value="+7">+7</option><option value="+375">+375</option><option value="+374">+374</option><option value="+995">+995</option><option value="+380">+380</option></select><input id=number inputmode=numeric placeholder="918 123-45-67" maxlength=13></div><button>Сохранить</button></form><div class=card id=cards></div></section>
 <section id=host class=hide><form id=host-form><b>Ведущий круглого стола</b><input name=callsign list=host-calls placeholder="Позывной ведущего" autocomplete=off><datalist id=host-calls></datalist><input id=host-pass name=password placeholder="Пароль для ведущего"><button class=ghost type=button onclick=makePass()>Придумать пароль</button><button>Назначить ведущего</button></form></section>
-<section id=logs class=hide><div class=card><b>Связи Кубка</b><div id=loglist></div><button class=ghost type=button onclick=clearLogs()>Удалить все связи</button></div></section>
+<section id=logs class=hide><div class=card><b>Связи Кубка</b><div id=loglist></div><button class=ghost type=button onclick=clearLogs()>Удалить все связи</button></div></section><section id=photos class=hide><form id=photo-form><b>Альбом</b><input id=photo-title placeholder=Название><input id=photo-sub placeholder=Подзаголовок><textarea id=photo-note placeholder=Подпись rows=3></textarea><div id=photo-list></div><button>Сохранить фото</button></form></section>
 </div></main>
 <script>
 const login=document.getElementById('login'), app=document.getElementById('app');
 function mask(v){const d=v.replace(/\D/g,'').slice(0,10); let s=d.slice(0,3); if(d.length>3)s+=' '+d.slice(3,6); if(d.length>6)s+='-'+d.slice(6,8); if(d.length>8)s+='-'+d.slice(8,10); return s;}
 document.getElementById('number').addEventListener('input', e=>{e.target.value=mask(e.target.value);});
 function makePass(){const words=['море','волна','маяк','гора','чайка','эфир','солнце','антенна']; const pass=words[Math.floor(Math.random()*words.length)]+'-'+String(Math.floor(Math.random()*90)+10); const field=document.getElementById('host-pass'); field.value=pass; field.type='text';}
-function showTab(name){document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on', b.dataset.tab===name)); ['people','host','logs'].forEach(id=>document.getElementById(id).classList.toggle('hide', id!==name));}
+function showTab(name){document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on', b.dataset.tab===name)); ['people','host','logs','photos'].forEach(id=>document.getElementById(id).classList.toggle('hide', id!==name)); if(name==='photos') loadPhotos();}
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>showTab(b.dataset.tab));
 async function api(url, opts){const res=await fetch(url, opts); if(res.status==401){app.hidden=true; login.hidden=false; throw new Error('auth');} const data=await res.json(); if(!res.ok) throw new Error(data.error||'ошибка'); return data;}
 async function loadLocators(){const list=await api('/api/locators'); const sel=document.getElementById('locator'); const cur=sel.value; sel.innerHTML='<option value="">Локатор</option>'+list.map(x=>'<option value="'+x.code+'">'+x.code+' — '+x.title+'</option>').join(''); sel.value=cur;}
@@ -532,6 +593,14 @@ function fill(p){const f=document.getElementById('edit'); for (const k of ['id',
 async function lookup(){document.getElementById('qrz-err').textContent=''; const res=await fetch('/api/qrz?call='+encodeURIComponent(document.getElementById('edit').callsign.value)); const data=await res.json(); if(!res.ok){document.getElementById('qrz-err').textContent=data.error||'Не нашлось'; return;} fill(data);}
 document.getElementById('edit').onsubmit=async(e)=>{e.preventDefault(); const digits=document.getElementById('number').value.replace(/\D/g,''); e.target.phone.value=digits?document.getElementById('code').value+' '+document.getElementById('number').value:''; await api('/api/operators',{method:'POST', body:new URLSearchParams(new FormData(e.target))}); e.target.reset(); document.getElementById('number').value=''; load();};
 async function del(id){if(!confirm('Удалить?')) return; await api('/api/operators?id='+id,{method:'DELETE'}); load();}
+let photoAlbum={items:[]};
+function esc(s){return String(s||'').replace(/&/g,'&').replace(/</g,'<').replace(/"/g,'"');}
+async function loadPhotos(){photoAlbum=await api('/api/photos'); document.getElementById('photo-title').value=photoAlbum.title||''; document.getElementById('photo-sub').value=photoAlbum.subtitle||''; document.getElementById('photo-note').value=photoAlbum.note||''; drawPhotos();}
+function drawPhotos(){document.getElementById('photo-list').innerHTML=(photoAlbum.items||[]).map((p,i)=>'<div class=person><img src="/'+p.file+'" alt="" style="width:72px;height:54px;object-fit:cover;border-radius:6px"><div style="flex:1"><input data-i="'+i+'" value="'+esc(p.title)+'" oninput="photoAlbum.items['+i+'].title=this.value"></div><button type=button onclick="movePhoto('+i+',-1)">Выше</button><button type=button onclick="movePhoto('+i+',1)">Ниже</button><button class=ghost type=button onclick="dropPhoto('+i+')">Удалить</button></div>').join('')||'<p>Фото нет</p>';}
+function movePhoto(i,dir){const j=i+dir; if(j<0||j>=photoAlbum.items.length) return; const a=photoAlbum.items; [a[i],a[j]]=[a[j],a[i]]; drawPhotos();}
+function dropPhoto(i){if(!confirm('Убрать это фото с сайта? Файл тоже удалится.')) return; photoAlbum.items.splice(i,1); drawPhotos();}
+document.getElementById('photo-form').onsubmit=async(e)=>{e.preventDefault(); photoAlbum.title=document.getElementById('photo-title').value; photoAlbum.subtitle=document.getElementById('photo-sub').value; photoAlbum.note=document.getElementById('photo-note').value; const res=await fetch('/api/admin/photos',{method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(photoAlbum)}); if(!res.ok){alert('Не сохранилось'); return;} photoAlbum=await res.json(); drawPhotos(); alert('Фото сохранены');};
+
 </script></body></html>'''
 
 if __name__ == "__main__":

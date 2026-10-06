@@ -101,12 +101,9 @@
     </div>
   </section>
   <section id="photo" class="hide">
-    <h2>Слёт радиолюбителей Большого Сочи</h2>
-    <p>26 сентября 2026 · санаторий «Белые ночи»</p>
-    <div class="card">
-      <b>Кто на общем снимке</b>
-      <p>RV6BEU, UD6AXG, UD6AVX, UA6BRA, RV6AOL, RW6AER, R6DYE, UA6ARR, UD6HWS, RO7C, RG7A, R6DZM, R6DQK, RN6AJ, R6DKO, R6ADW. Если позывной подписан неверно — поправьте.</p>
-    </div>
+    <h2 id="photo-title">Фото</h2>
+    <p id="photo-sub"></p>
+    <div class="card" id="photo-note"></div>
     <div class="grid" id="album"></div>
   </section>
   <section id="video" class="hide">
@@ -152,16 +149,20 @@ async function people(){
 }
 round(); people(); setInterval(round, 5000);
 
-const album=document.getElementById("album");
-if(album){
-  const labeled='<div class="shot"><a href="photos/slet-2026-09-26/labeled.jpg" target="_blank"><img src="photos/slet-2026-09-26/labeled.jpg" alt="общий снимок с позывными"></a><p>Общий снимок с позывными</p></div>';
-  let html=labeled;
-  for(let n=1;n<=61;n++){
-    const name=String(n).padStart(2,"0")+".jpg";
-    html+='<div class="shot"><a href="photos/slet-2026-09-26/'+name+'" target="_blank"><img src="photos/slet-2026-09-26/'+name+'" alt="слёт '+n+'"></a><p>Снимок '+n+'</p></div>';
-  }
-  album.innerHTML=html;
+async function album(){
+  const box=document.getElementById("album");
+  if(!box) return;
+  try{
+    const data=await fetch("/api/photos").then(r=>r.json());
+    document.getElementById("photo-title").textContent=data.title||"Фото";
+    document.getElementById("photo-sub").textContent=data.subtitle||"";
+    const note=document.getElementById("photo-note");
+    note.innerHTML=data.note?("<p>"+data.note+"</p>"):"";
+    note.classList.toggle("hide", !data.note);
+    box.innerHTML=(data.items||[]).map(p=>'<div class="shot"><a href="'+p.file+'" target="_blank"><img src="'+p.file+'" alt=""></a><p>'+(p.title||"")+'</p></div>').join("")||"<p>Пока нет фото</p>";
+  }catch(e){ box.innerHTML="<p>Фото не открылись</p>"; }
 }
+album();
 
 fetch("/api/me").then(r=>r.json()).then(me=>{
   const link=document.getElementById("login-link");
