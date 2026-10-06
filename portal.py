@@ -15,7 +15,18 @@ DB_USER = os.environ.get("PGUSER", "sochiham")
 DB_PASSWORD = os.environ.get("PGPASSWORD", "")
 QRZ_USER = os.environ.get("QRZ_USER", "")
 QRZ_PASSWORD = os.environ.get("QRZ_PASSWORD", "")
-SECRET = os.environ.get("ADMIN_SECRET", secrets.token_hex(16))
+def stable_secret():
+    given = os.environ.get("ADMIN_SECRET", "").strip()
+    if given:
+        return given
+    path = Path(__file__).resolve().parent / "data" / "secret.txt"
+    path.parent.mkdir(exist_ok=True)
+    if path.exists() and path.read_text().strip():
+        return path.read_text().strip()
+    value = secrets.token_hex(16)
+    path.write_text(value)
+    return value
+SECRET = stable_secret()
 QRZ_SESSION = ""
 
 def token():
@@ -401,8 +412,8 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_header("Content-Type", "application/json")
         body = b'{"ok":true}'
         self.send_header("Content-Length", str(len(body)))
-        self.send_header("Set-Cookie", f"ham={ham_token(callsign)}; HttpOnly; Path=/; Max-Age=2592000")
-        self.send_header("Set-Cookie", f"ham_call={callsign}; Path=/; Max-Age=2592000")
+        self.send_header("Set-Cookie", f"ham={ham_token(callsign)}; HttpOnly; Path=/; Max-Age=31536000; SameSite=Lax")
+        self.send_header("Set-Cookie", f"ham_call={callsign}; Path=/; Max-Age=31536000; SameSite=Lax")
         self.end_headers()
         self.wfile.write(body)
     def enter(self, form):
