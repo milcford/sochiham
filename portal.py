@@ -414,7 +414,6 @@ class Handler(SimpleHTTPRequestHandler):
             taken = psql(f"SELECT callsign FROM site_accounts WHERE lower(email)={q(email)} AND callsign<>{q(call)} LIMIT 1;").strip()
             if taken:
                 return self.send_json({"error": "Эта почта уже занята."}, 409)
-            year_sql = str(int(year)) if year else "NULL"
             try:
                 psql(f"""UPDATE site_accounts SET name={q(name)}, email={q(email)}, surname={q(surname)}, patronymic={q(patronymic)}, city={q(city)}, locator={q(locator)}, phone={q(phone)}, about={q(about)}, birth_year={year_sql}, birth_date={date_sql}, show_phone={show_phone}, show_birth={show_birth} WHERE callsign={q(call)};""")
             except Exception as exc:
