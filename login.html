@@ -5,24 +5,27 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Вход — радиолюбители Сочи</title>
 <style>
-  body { margin:0; font-family: "Segoe UI", system-ui, sans-serif; background:#faf7f4; color:#1c1917; }
+  body { margin:0; font-family: "Segoe UI", system-ui, sans-serif; background:#f6f7f6; color:#1a1f1c; }
   main { max-width:480px; margin:0 auto; padding:24px 16px; }
   form, .card { background:#fff; border-radius:16px; padding:16px; margin-top:12px; }
-  input { width:100%; box-sizing:border-box; padding:12px; margin:8px 0; font-size:16px; border:1px solid #e7e5e4; border-radius:12px; }
-  button { width:100%; background:#e85d04; color:#fff; border:0; border-radius:12px; padding:14px; font-size:18px; font-weight:700; cursor:pointer; }
+  input { width:100%; box-sizing:border-box; padding:12px; margin:8px 0; font-size:16px; border:1px solid #e4e7e4; border-radius:12px; }
+  button { width:100%; background:#1f6b45; color:#fff; border:0; border-radius:12px; padding:14px; font-size:18px; font-weight:700; cursor:pointer; }
   nav { display:flex; gap:8px; flex-wrap:wrap; }
-  nav button { width:auto; background:#fff; color:#1c1917; border:1px solid #e7e5e4; border-radius:999px; padding:8px 12px; font-size:16px; }
-  nav button.on { background:#e85d04; color:#fff; border-color:#e85d04; }
-  a { color:#e85d04; }
+  nav button { width:auto; background:#fff; color:#1a1f1c; border:1px solid #e4e7e4; border-radius:999px; padding:8px 12px; font-size:16px; }
+  nav button.on { background:#1f6b45; color:#fff; border-color:#1f6b45; }
+  header { background:#fff; border-bottom:1px solid #e4e7e4; padding:16px 28px; }
+  header b { font-size:18px; }
+  header a { color:#5e6a62; text-decoration:none; margin-left:12px; }
+  a { color:#1f6b45; }
   .err { color:#b91c1c; }
   .ok { color:#1b7a3a; }
   .hide { display:none; }
 </style>
 </head>
 <body>
+<header><b>Радиолюбители Сочи</b><a href="index.html">На портал</a></header>
 <main>
-  <p><a href="index.html">На портал</a></p>
-  <h1>Свой вход</h1>
+  <h1>Вход</h1>
   <p id="who" class="ok"></p>
   <nav>
     <button type="button" class="on" data-tab="login">Вход</button>
