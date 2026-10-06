@@ -58,6 +58,42 @@ def ensure_login():
       reset_token text DEFAULT '',
       reset_until timestamptz
     );""")
+    for col, kind in (
+        ("surname", "text DEFAULT ''"),
+        ("patronymic", "text DEFAULT ''"),
+        ("city", "text DEFAULT ''"),
+        ("locator", "text DEFAULT ''"),
+        ("phone", "text DEFAULT ''"),
+        ("about", "text DEFAULT ''"),
+        ("birth_year", "integer"),
+        ("show_phone", "boolean DEFAULT false"),
+        ("show_birth", "boolean DEFAULT false"),
+    ):
+        psql(f"ALTER TABLE site_accounts ADD COLUMN IF NOT EXISTS {col} {kind};")
+
+def profile_view(callsign):
+    ensure_login()
+    row = psql(f"""SELECT a.callsign, COALESCE(a.name,''), COALESCE(a.email,''),
+      COALESCE(NULLIF(a.surname,''), o.surname, ''),
+      COALESCE(NULLIF(a.patronymic,''), o.patronymic, ''),
+      COALESCE(NULLIF(a.city,''), o.city, ''),
+      COALESCE(NULLIF(a.locator,''), o.locator, ''),
+      COALESCE(NULLIF(a.phone,''), o.phone, ''),
+      COALESCE(NULLIF(a.about,''), o.about, ''),
+      COALESCE(a.birth_year::text, ''),
+      CASE WHEN a.show_phone THEN '1' ELSE '' END,
+      CASE WHEN a.show_birth THEN '1' ELSE '' END
+      FROM site_accounts a
+      LEFT JOIN operators o ON o.callsign=a.callsign
+      WHERE a.callsign={q(callsign)} LIMIT 1;""").strip()
+    if not row:
+        return None
+    bits = row.split("|")
+    keys = ["callsign","name","email","surname","patronymic","city","locator","phone","about","birth_year","show_phone","show_birth"]
+    data = dict(zip(keys, bits + [""]*len(keys)))
+    data["show_phone"] = bool(data["show_phone"])
+    data["show_birth"] = bool(data["show_birth"])
+    return data
 
 def hash_password(password):
     salt = secrets.token_hex(8)
@@ -201,8 +237,8 @@ class Handler(SimpleHTTPRequestHandler):
             call = ham_from_cookie(self.headers.get("Cookie", ""))
             if not call:
                 return self.send_json({"callsign": ""})
-            person = ham_profile(call) or {"callsign": call, "name": ""}
-            return self.send_json({"callsign": person["callsign"], "name": person["name"], "email": person.get("email","")})
+            person = profile_view(call) or {"callsign": call, "name": ""}
+            return self.send_json(person)
         if path == "/api/messages":
             if not ham_from_cookie(self.headers.get("Cookie", "")):
                 return self.send_json({"error": "Сначала войдите по позывному."}, 401)
@@ -227,8 +263,12 @@ class Handler(SimpleHTTPRequestHandler):
             rows = psql("SELECT a.my_call, a.dx_call, a.band, to_char(a.worked_at, 'DD.MM HH24:MI'), COALESCE(round(2*6371*asin(sqrt(power(sin(radians(b.my_lat-a.my_lat)/2),2)+cos(radians(a.my_lat))*cos(radians(b.my_lat))*power(sin(radians(b.my_lon-a.my_lon)/2),2))))::text,''), CASE WHEN b.id IS NOT NULL THEN 'yes' ELSE 'no' END, COALESCE(a.my_locator,''), COALESCE(b.my_locator,'') FROM contest_logs a LEFT JOIN LATERAL (SELECT * FROM contest_logs b WHERE b.my_call=a.dx_call AND b.dx_call=a.my_call AND b.band=a.band AND b.my_lat IS NOT NULL AND abs(extract(epoch FROM (b.worked_at-a.worked_at)))<=900 ORDER BY abs(extract(epoch FROM (b.worked_at-a.worked_at))) LIMIT 1) b ON true ORDER BY a.worked_at DESC;")
             return self.send_json([dict(zip(["my_call","dx_call","band","worked_at","km","pair","my_loc","dx_loc"], line.split("|"))) for line in rows.splitlines() if line.strip()])
         if path.startswith("/api/calls"):
-            rows = psql("SELECT callsign, COALESCE(name,''), COALESCE(locator,'') FROM operators ORDER BY callsign;")
-            return self.send_json([dict(zip(["callsign","name","locator"], line.split("|"))) for line in rows.splitlines() if line.strip()])
+            ensure_login()
+            rows = psql("""SELECT o.callsign, COALESCE(o.name,''), COALESCE(o.city,''), COALESCE(o.locator,''),
+              CASE WHEN a.show_phone THEN COALESCE(NULLIF(a.phone,''), o.phone, '') ELSE '' END,
+              CASE WHEN a.show_birth THEN COALESCE(a.birth_year::text,'') ELSE '' END
+              FROM operators o LEFT JOIN site_accounts a ON a.callsign=o.callsign ORDER BY o.callsign;""")
+            return self.send_json([dict(zip(["callsign","name","city","locator","phone","birth_year"], line.split("|"))) for line in rows.splitlines() if line.strip()])
         if path.startswith("/api/locators"):
             rows = psql("SELECT code, title FROM locators ORDER BY code;")
             return self.send_json([dict(zip(["code","title"], line.split("|"))) for line in rows.splitlines() if line.strip()])
@@ -340,15 +380,28 @@ class Handler(SimpleHTTPRequestHandler):
             call = ham_from_cookie(self.headers.get("Cookie", ""))
             if not call:
                 return self.send_json({"error": "Сначала войдите."}, 401)
+            ensure_login()
             name = form.get("name", "").strip()[:40]
             email = form.get("email", "").strip().lower()[:80]
+            surname = form.get("surname", "").strip()[:40]
+            patronymic = form.get("patronymic", "").strip()[:40]
+            city = form.get("city", "").strip()[:40]
+            locator = form.get("locator", "").strip().upper()[:6]
+            phone = form.get("phone", "").strip()[:20]
+            about = form.get("about", "").strip()[:300]
+            year = form.get("birth_year", "").strip()
+            show_phone = "true" if form.get("show_phone") else "false"
+            show_birth = "true" if form.get("show_birth") else "false"
             if not name or "@" not in email:
                 return self.send_json({"error": "Нужны имя и почта."}, 400)
+            if year and (not year.isdigit() or not 1920 <= int(year) <= 2020):
+                return self.send_json({"error": "Год рождения: число от 1920 до 2020."}, 400)
             taken = psql(f"SELECT callsign FROM site_accounts WHERE lower(email)={q(email)} AND callsign<>{q(call)} LIMIT 1;").strip()
             if taken:
                 return self.send_json({"error": "Эта почта уже занята."}, 409)
-            psql(f"UPDATE site_accounts SET name={q(name)}, email={q(email)} WHERE callsign={q(call)};")
-            psql(f"UPDATE operators SET name={q(name)} WHERE callsign={q(call)};")
+            year_sql = str(int(year)) if year else "NULL"
+            psql(f"""UPDATE site_accounts SET name={q(name)}, email={q(email)}, surname={q(surname)}, patronymic={q(patronymic)}, city={q(city)}, locator={q(locator)}, phone={q(phone)}, about={q(about)}, birth_year={year_sql}, show_phone={show_phone}, show_birth={show_birth} WHERE callsign={q(call)};""")
+            psql(f"""UPDATE operators SET name={q(name)}, surname={q(surname)}, patronymic={q(patronymic)}, city={q(city)}, locator={q(locator)}, phone={q(phone)}, about={q(about)} WHERE callsign={q(call)};""")
             return self.send_json({"ok": True})
         if path in ("/api/enter", "/api/register", "/api/forgot", "/api/reset"):
             try:

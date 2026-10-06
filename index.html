@@ -121,7 +121,7 @@ async function round(){
 async function people(){
   try {
     const rows=await fetch('/api/calls').then(r=>r.json());
-    document.getElementById('people-list').innerHTML=rows.map(p=>'<div class="person"><b>'+p.callsign+'</b><span>'+(p.name||'')+'</span></div>').join('')||'<div class="row"><span>пока никого нет</span></div>';
+    document.getElementById('people-list').innerHTML=rows.map(p=>'<div class="person"><b>'+p.callsign+'</b><span>'+[p.name,p.city,p.locator,p.phone,p.birth_year].filter(Boolean).join(' · ')+'</span></div>').join('')||'<div class="row"><span>пока никого нет</span></div>';
   } catch(e) {
     document.getElementById('people-list').innerHTML='<div class="row"><span>список не открылся</span></div>';
   }
