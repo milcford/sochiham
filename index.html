@@ -138,11 +138,9 @@
     <div class="grid" id="album"></div>
   </section>
   <section id="video" class="hide">
-    <h2>Видео со слёта</h2>
-    <p>26 сентября 2026 · «Белые ночи»</p>
-    <div class="video-card"><video controls preload="metadata"><source src="video/slet-2026-09-26/01.mp4" type="video/mp4"></video><p>Ролик 1</p></div>
-    <div class="video-card"><video controls preload="metadata"><source src="video/slet-2026-09-26/02.mp4" type="video/mp4"></video><p>Ролик 2</p></div>
-    <div class="video-card"><video controls preload="metadata"><source src="video/slet-2026-09-26/03.mp4" type="video/mp4"></video><p>Ролик 3</p></div>
+    <h2 id="video-title">Видео</h2>
+    <p id="video-sub"></p>
+    <div id="video-list"></div>
   </section>
   <section id="ads" class="hide">
     <h2>Объявления</h2>
@@ -209,6 +207,17 @@ async function album(){
     box.innerHTML=shots.map((p,i)=>'<div class="shot"><button type="button" onclick="openView('+i+')"><img src="'+p.file+'" alt=""></button><p>'+(p.title||"")+'</p></div>').join("")||"<p>Пока нет фото</p>";
 }
 album();
+async function videos(){
+  const box=document.getElementById("video-list");
+  if(!box) return;
+  try{
+    const data=await fetch("/api/videos").then(r=>r.json());
+    document.getElementById("video-title").textContent=data.title||"Видео";
+    document.getElementById("video-sub").textContent=data.subtitle||"";
+    box.innerHTML=(data.items||[]).map(v=>'<div class="video-card"><video controls preload="metadata"><source src="'+v.file+'" type="video/mp4"></video><p><b>'+(v.title||"")+'</b><br>'+(v.text||"")+'</p></div>').join("")||"<p>Пока нет видео</p>";
+  }catch(e){ box.innerHTML="<p>Видео не открылись</p>"; }
+}
+videos();
 let shots=[];
 let shotAt=0;
 function openView(i){ if(!shots.length) return; shotAt=(i+shots.length)%shots.length; const s=shots[shotAt]; document.getElementById("view-img").src=s.file; document.getElementById("view-cap").textContent=(s.title||"")+" · "+(shotAt+1)+" / "+shots.length; document.getElementById("viewer").classList.remove("hide"); }

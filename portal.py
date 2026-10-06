@@ -243,6 +243,45 @@ def drop_removed_photos(old, new):
         if path.is_file():
             path.unlink()
 
+
+VIDEOS_FILE = Path(__file__).resolve().parent / "data" / "videos.json"
+
+def load_videos():
+    if VIDEOS_FILE.exists():
+        try:
+            data = json.loads(VIDEOS_FILE.read_text(encoding="utf-8"))
+            if isinstance(data.get("items"), list):
+                return data
+        except Exception:
+            pass
+    return {"title": "Видео", "subtitle": "", "items": []}
+
+def save_videos(data):
+    VIDEOS_FILE.parent.mkdir(exist_ok=True)
+    clean = []
+    root = Path(__file__).resolve().parent
+    for item in data.get("items") or []:
+        file = str(item.get("file") or "").replace("\\", "/").lstrip("/")
+        if not file.startswith("video/") or ".." in file:
+            continue
+        if not (root / file).is_file():
+            continue
+        clean.append({"file": file, "title": str(item.get("title") or "Ролик")[:120], "text": str(item.get("text") or "")[:300]})
+    out = {"title": str(data.get("title") or "Видео")[:80], "subtitle": str(data.get("subtitle") or "")[:120], "items": clean}
+    VIDEOS_FILE.write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8")
+    return out
+
+def drop_removed_videos(old, new):
+    keep = {item["file"] for item in new.get("items") or []}
+    root = Path(__file__).resolve().parent
+    for item in old.get("items") or []:
+        file = item.get("file") or ""
+        if file in keep or not file.startswith("video/") or ".." in file:
+            continue
+        path = root / file
+        if path.is_file():
+            path.unlink()
+
 class Handler(SimpleHTTPRequestHandler):
     def end_headers(self):
         path = self.path.split("?", 1)[0]
@@ -272,6 +311,8 @@ class Handler(SimpleHTTPRequestHandler):
             return self.send_html(ADMIN_PAGE)
         if path == "/api/photos":
             return self.send_json(load_album())
+        if path == "/api/videos":
+            return self.send_json(load_videos())
         if path == "/api/round":
             return self.send_json(round_view())
         if path == "/api/logout":
@@ -419,6 +460,19 @@ class Handler(SimpleHTTPRequestHandler):
         psql(f"INSERT INTO chat_messages (room, callsign, name, body) VALUES ({q(room)}, {q(callsign)}, {q(name)}, {q(text)});")
         row = psql("SELECT row_to_json(t)::text FROM (SELECT id, room, callsign, name, body AS text, to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS created_at FROM chat_messages ORDER BY id DESC LIMIT 1) t;")
         return self.send_json({"message": json.loads(row.strip())})
+    def videos_save(self):
+        if not self.cookie_ok():
+            return self.send_json({"error": "auth"}, 401)
+        length = int(self.headers.get("Content-Length", "0"))
+        raw = self.rfile.read(min(length, 200000))
+        try:
+            data = json.loads(raw.decode() or "{}")
+        except Exception:
+            return self.send_json({"error": "Не разобрал список видео."}, 400)
+        old = load_videos()
+        saved = save_videos(data)
+        drop_removed_videos(old, saved)
+        return self.send_json(saved)
     def photos_save(self):
         if not self.cookie_ok():
             return self.send_json({"error": "auth"}, 401)
@@ -438,6 +492,8 @@ class Handler(SimpleHTTPRequestHandler):
             return self.chat_post()
         if path == "/api/admin/photos":
             return self.photos_save()
+        if path == "/api/admin/videos":
+            return self.videos_save()
         form = self.read_form()
         if path == "/api/profile":
             call = ham_from_cookie(self.headers.get("Cookie", ""))
@@ -569,17 +625,17 @@ ADMIN_PAGE = r'''<!DOCTYPE html><html lang=ru><head><meta charset=utf-8><meta na
 <body><header style="background:#fff;border-bottom:1px solid #e4e7e4;padding:16px 28px"><b>Радиолюбители Сочи</b> <a href="/index.html" style="margin-left:12px;color:#5e6a62;text-decoration:none">Главная</a></header><main><p><a href="index.html">Главная</a></p><h1>Админка</h1>
 <form id=login><input name=password type=password placeholder="Пароль админки" required><button>Войти</button><p class=err id=login-err></p></form>
 <div id=app hidden>
-<nav><button type=button class=on data-tab=people>Люди</button><button type=button data-tab=host>Ведущий</button><button type=button data-tab=logs>Связи</button><button type=button data-tab=photos>Фото</button></nav>
+<nav><button type=button class=on data-tab=people>Люди</button><button type=button data-tab=host>Ведущий</button><button type=button data-tab=logs>Связи</button><button type=button data-tab=photos>Фото</button><button type=button data-tab=videos>Видео</button></nav>
 <section id=people><form id=edit><input name=id type=hidden><input name=phone type=hidden><input name=callsign placeholder=Позывной required><button class=ghost type=button onclick=lookup()>Найти на qrz.ru</button><p class=err id=qrz-err></p><input name=surname placeholder=Фамилия><input name=name placeholder=Имя required><input name=patronymic placeholder="Отчество, если есть"><input name=city placeholder=Город><select name=locator id=locator><option value="">Локатор</option></select><p class=hint>Телефон</p><div class=phone><select id=code><option value="+7">+7</option><option value="+375">+375</option><option value="+374">+374</option><option value="+995">+995</option><option value="+380">+380</option></select><input id=number inputmode=numeric placeholder="918 123-45-67" maxlength=13></div><button>Сохранить</button></form><div class=card id=cards></div></section>
 <section id=host class=hide><form id=host-form><b>Ведущий круглого стола</b><input name=callsign list=host-calls placeholder="Позывной ведущего" autocomplete=off><datalist id=host-calls></datalist><input id=host-pass name=password placeholder="Пароль для ведущего"><button class=ghost type=button onclick=makePass()>Придумать пароль</button><button>Назначить ведущего</button></form></section>
-<section id=logs class=hide><div class=card><b>Связи Кубка</b><div id=loglist></div><button class=ghost type=button onclick=clearLogs()>Удалить все связи</button></div></section><section id=photos class=hide><form id=photo-form><b>Альбом</b><input id=photo-title placeholder=Название><input id=photo-sub placeholder=Подзаголовок><textarea id=photo-note placeholder=Подпись rows=3></textarea><p class=hint id=photo-status></p><div id=photo-list></div><button>Сохранить фото</button></form></section>
+<section id=logs class=hide><div class=card><b>Связи Кубка</b><div id=loglist></div><button class=ghost type=button onclick=clearLogs()>Удалить все связи</button></div></section><section id=videos class=hide><form id=video-form><b>Видео</b><input id=video-title placeholder=Название><input id=video-sub placeholder=Подзаголовок><p class=hint id=video-status></p><div id=video-list></div><button>Сохранить видео</button></form></section><section id=photos class=hide><form id=photo-form><b>Альбом</b><input id=photo-title placeholder=Название><input id=photo-sub placeholder=Подзаголовок><textarea id=photo-note placeholder=Подпись rows=3></textarea><p class=hint id=photo-status></p><div id=photo-list></div><button>Сохранить фото</button></form></section>
 </div></main><div id=viewer class="viewer hide" style="display:none"><button type=button class="navbtn vx" onclick="closeView()">Закрыть</button><button type=button class="navbtn vprev" onclick="stepView(-1)">‹</button><img id=view-img alt=""><button type=button class="navbtn vnext" onclick="stepView(1)">›</button><button type=button class="navbtn vdel" onclick="dropPhoto(window.shotAt)">Удалить</button><p id=view-cap></p></div>
 <script>
 const login=document.getElementById('login'), app=document.getElementById('app');
 function mask(v){const d=v.replace(/\D/g,'').slice(0,10); let s=d.slice(0,3); if(d.length>3)s+=' '+d.slice(3,6); if(d.length>6)s+='-'+d.slice(6,8); if(d.length>8)s+='-'+d.slice(8,10); return s;}
 document.getElementById('number').addEventListener('input', e=>{e.target.value=mask(e.target.value);});
 function makePass(){const words=['море','волна','маяк','гора','чайка','эфир','солнце','антенна']; const pass=words[Math.floor(Math.random()*words.length)]+'-'+String(Math.floor(Math.random()*90)+10); const field=document.getElementById('host-pass'); field.value=pass; field.type='text';}
-function showTab(name){document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on', b.dataset.tab===name)); ['people','host','logs','photos'].forEach(id=>document.getElementById(id).classList.toggle('hide', id!==name)); if(name==='photos') loadPhotos();}
+function showTab(name){document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on', b.dataset.tab===name)); ['people','host','logs','photos','videos'].forEach(id=>document.getElementById(id).classList.toggle('hide', id!==name)); if(name==='photos') loadPhotos(); if(name==='videos') loadVideos();}
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>showTab(b.dataset.tab));
 async function api(url, opts){const res=await fetch(url, opts); if(res.status==401){app.hidden=true; login.hidden=false; throw new Error('auth');} const data=await res.json(); if(!res.ok) throw new Error(data.error||'ошибка'); return data;}
 async function loadLocators(){const list=await api('/api/locators'); const sel=document.getElementById('locator'); const cur=sel.value; sel.innerHTML='<option value="">Локатор</option>'+list.map(x=>'<option value="'+x.code+'">'+x.code+' — '+x.title+'</option>').join(''); sel.value=cur;}
@@ -608,6 +664,16 @@ function movePhoto(i,dir){const j=i+dir; if(j<0||j>=photoAlbum.items.length) ret
 async function dropPhoto(i){if(i<0||i>=photoAlbum.items.length) return; photoAlbum.items.splice(i,1); drawPhotos(); const stay=document.getElementById('viewer').style.display==='flex'; await savePhotos(false); if(!stay) return; if(!photoAlbum.items.length) closeView(); else openView(Math.min(i, photoAlbum.items.length-1));}
 async function savePhotos(tell, keep){photoAlbum.title=document.getElementById('photo-title').value; photoAlbum.subtitle=document.getElementById('photo-sub').value; photoAlbum.note=document.getElementById('photo-note').value; const res=await fetch('/api/admin/photos',{method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(photoAlbum)}); const st=document.getElementById('photo-status'); if(!res.ok){if(st) st.textContent='Не сохранилось'; return;} photoAlbum=await res.json(); if(!keep) drawPhotos(); if(st) st.textContent='Сохранено'; if(tell) alert('Фото сохранены');}
 document.getElementById('photo-form').onsubmit=async(e)=>{e.preventDefault(); await savePhotos(true);};
+let videoAlbum={items:[]};
+async function loadVideos(){videoAlbum=await api('/api/videos'); document.getElementById('video-title').value=videoAlbum.title||''; document.getElementById('video-sub').value=videoAlbum.subtitle||''; drawVideos();}
+function drawVideos(){document.getElementById('video-list').innerHTML=(videoAlbum.items||[]).map((p,i)=>'<div class=shotrow><video src="/'+p.file+'" controls preload=metadata style="width:100%;max-height:280px;background:#111;border-radius:12px"></video><input value="'+esc(p.title)+'" oninput="rememberVideo('+i+', \'title\', this.value)" placeholder=Название><textarea oninput="rememberVideo('+i+', \'text\', this.value)" placeholder=Описание rows=2>'+esc(p.text||'')+'</textarea><div class=shotbtns><button type=button onclick="moveVideo('+i+',-1)">Выше</button><button type=button onclick="moveVideo('+i+',1)">Ниже</button><button class=ghost type=button onclick="dropVideo('+i+')">Удалить</button></div></div>').join('')||'<p>Видео нет</p>';}
+let videoTimer;
+function rememberVideo(i, key, value){videoAlbum.items[i][key]=value; const st=document.getElementById('video-status'); if(st) st.textContent='Сохраняю...'; clearTimeout(videoTimer); videoTimer=setTimeout(()=>saveVideos(false, true), 500);}
+function moveVideo(i,dir){const j=i+dir; if(j<0||j>=videoAlbum.items.length) return; const a=videoAlbum.items; [a[i],a[j]]=[a[j],a[i]]; drawVideos(); saveVideos(false);}
+async function dropVideo(i){if(i<0||i>=videoAlbum.items.length) return; videoAlbum.items.splice(i,1); drawVideos(); await saveVideos(false);}
+async function saveVideos(tell, keep){videoAlbum.title=document.getElementById('video-title').value; videoAlbum.subtitle=document.getElementById('video-sub').value; const res=await fetch('/api/admin/videos',{method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(videoAlbum)}); const st=document.getElementById('video-status'); if(!res.ok){if(st) st.textContent='Не сохранилось'; return;} videoAlbum=await res.json(); if(!keep) drawVideos(); if(st) st.textContent='Сохранено'; if(tell) alert('Видео сохранены');}
+document.getElementById('video-form').onsubmit=async(e)=>{e.preventDefault(); await saveVideos(true);};
+
 
 </script></body></html>'''
 
