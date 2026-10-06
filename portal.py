@@ -5,6 +5,7 @@ from email.mime.text import MIMEText
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from urllib.error import HTTPError
 from urllib.parse import parse_qs, urlencode
+from pathlib import Path
 from urllib.request import Request, urlopen
 HOST = os.environ.get("PORTAL_HOST", "0.0.0.0")
 PORT = int(os.environ.get("PORTAL_PORT", "8080"))
