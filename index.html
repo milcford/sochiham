@@ -5,51 +5,50 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Сочи — радиолюбители</title>
 <style>
-  :root { --orange:#e85d04; --green:#1b7a3a; --ink:#1c1917; --muted:#78716c; --bg:#faf7f4; --card:#fff; }
+  :root { --orange:#c2410c; --green:#1f6b45; --ink:#1c1917; --muted:#78716c; --bg:#f4efe8; --card:#fff; }
   * { box-sizing: border-box; }
   body { margin:0; font-family: "Segoe UI", system-ui, sans-serif; background:var(--bg); color:var(--ink); }
-  header { background:#fff; border-bottom:3px solid var(--orange); padding:14px 18px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:5; gap:12px; }
-  .user { font-size:14px; color:#1b7a3a; font-weight:700; white-space:nowrap; text-decoration:none; }
-  .user span { display:block; color:#78716c; font-weight:500; font-size:12px; }
-  header b { font-size:18px; }
-  header span { color:var(--muted); font-size:13px; display:block; }
-  nav { display:flex; gap:8px; flex-wrap:wrap; }
-  nav button, nav a { border:1px solid #e7e5e4; background:#fff; border-radius:999px; padding:8px 12px; font-weight:600; cursor:pointer; color:var(--ink); text-decoration:none; font-size:16px; }
-  nav button.on { background:var(--orange); color:#fff; border-color:var(--orange); }
-  main { max-width:980px; margin:0 auto; padding:16px; }
-  .card { background:var(--card); border-radius:16px; padding:16px; margin-bottom:12px; box-shadow:0 1px 2px rgba(0,0,0,.04); }
-  .card > b { display:block; margin:0 0 10px; font-size:20px; }
-  .when { display:flex; justify-content:space-between; align-items:center; }
-  .when h1 { margin:0; font-size:28px; }
-  .mhz { color:var(--orange); font-weight:800; font-size:22px; margin:4px 0 0; }
-  .live { background:var(--green); color:#fff; border-radius:16px; padding:18px; margin-bottom:12px; }
-  .live small { opacity:.85; font-size:16px; }
-  .live strong { display:block; font-size:32px; }
-  .live em { font-style:normal; font-size:22px; }
-  button.big, a.big { display:block; width:100%; border:0; background:var(--orange); color:#fff; font-size:18px; font-weight:700; border-radius:14px; padding:14px; margin:8px 0; cursor:pointer; text-align:center; text-decoration:none; box-sizing:border-box; }
-  button.ghost, a.ghost { background:#fff; color:var(--orange); border:2px solid var(--orange); }
-  .row { display:flex; justify-content:space-between; gap:12px; padding:10px 0; border-bottom:1px solid #f5f5f4; }
-  .person { display:flex; gap:18px; align-items:baseline; padding:5px 0; border-bottom:1px solid #f5f5f4; }
+  header { background:#1f3d32; color:#fff; padding:16px 22px 0; }
+  .top { display:flex; justify-content:space-between; align-items:flex-end; gap:16px; }
+  header b { font-size:22px; letter-spacing:.2px; }
+  header .sub { color:#d6d3d1; font-size:14px; display:block; margin-top:2px; }
+  .user { color:#fff; text-decoration:none; text-align:right; font-weight:800; }
+  .user span { display:block; color:#d6d3d1; font-weight:500; font-size:12px; }
+  nav { display:flex; gap:4px; flex-wrap:wrap; margin-top:14px; }
+  nav button, nav a { border:0; background:transparent; color:#e7e5e4; border-radius:12px 12px 0 0; padding:10px 14px; font-weight:650; cursor:pointer; text-decoration:none; font-size:16px; }
+  nav button.on, nav a:hover, nav button:hover { background:#f4efe8; color:#1c1917; }
+  main { max-width:860px; margin:0 auto; padding:22px 16px 40px; }
+  .card { background:var(--card); border-radius:18px; padding:18px; margin-bottom:14px; box-shadow:0 8px 24px rgba(60,40,20,.05); }
+  .card > b { display:block; margin:0 0 10px; font-size:18px; }
+  .when { display:flex; justify-content:space-between; align-items:center; background:#fffaf5; border:1px solid #f0e4d6; }
+  .when h1 { margin:0; font-size:30px; }
+  .mhz { color:var(--orange); font-weight:800; font-size:26px; margin:6px 0 0; letter-spacing:.3px; }
+  .live { background:var(--green); color:#fff; border-radius:18px; padding:20px; margin-bottom:14px; }
+  .live small { opacity:.85; font-size:15px; }
+  .live strong { display:block; font-size:34px; margin-top:4px; }
+  .live em { font-style:normal; font-size:18px; opacity:.9; }
+  button.big, a.big { display:block; width:100%; border:0; background:var(--orange); color:#fff; font-size:18px; font-weight:700; border-radius:14px; padding:14px; margin:8px 0; cursor:pointer; text-align:center; text-decoration:none; }
+  a.line { display:block; text-align:center; color:var(--orange); font-weight:700; text-decoration:none; border:1px solid #f0d2c2; border-radius:14px; padding:12px; }
+  .row, .person { display:flex; justify-content:space-between; gap:12px; padding:8px 0; border-bottom:1px solid #f5f5f4; }
   .person { display:grid; grid-template-columns:92px 1.2fr 1.4fr 70px 150px 60px; gap:8px; align-items:baseline; }
   .person b { min-width:0; }
   .person span { color:#57534e; }
   .heads { color:#a8a29e; font-size:13px; }
   #people-list { margin-bottom: 6px; }
   .grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
-  .shot, .video-card { background:#fff; border-radius:16px; overflow:hidden; box-shadow:0 1px 2px rgba(0,0,0,.05); margin-bottom:12px; }
-  .shot img, .video-card img { width:100%; height:180px; object-fit:cover; display:block; background:#eee; }
-  .shot p, .video-card p { margin:0; padding:10px 12px 12px; font-weight:650; }
-  .ph { height:180px; display:grid; place-items:center; background:#fff7ed; color:#e85d04; font-size:42px; }
-  video { width:100%; background:#000; max-height:420px; }
-  input, select { width:100%; padding:12px; border-radius:12px; border:1px solid #e7e5e4; font-size:16px; margin:6px 0; }
+  .shot, .video-card { background:#fff; border-radius:16px; overflow:hidden; box-shadow:0 1px 2px rgba(0,0,0,.04); }
+  .shot img, .video-card video { width:100%; display:block; aspect-ratio:4/3; object-fit:cover; background:#eee; }
+  .shot p, .video-card p { margin:8px 10px 12px; }
+  form input, form textarea, form select { width:100%; box-sizing:border-box; padding:12px; margin:6px 0; border:1px solid #e7e5e4; border-radius:12px; font:inherit; }
   .hide { display:none; }
-  footer { text-align:center; color:var(--muted); font-size:13px; padding:18px; }
-  @media (max-width:700px) { .grid { grid-template-columns:1fr; } }
+  footer { text-align:center; color:#a8a29e; padding:8px 16px 28px; }
+  @media (max-width:720px) { .person { grid-template-columns:1fr 1fr; } .grid { grid-template-columns:1fr; } }
 </style>
 </head>
 <body>
 <header>
-  <div><b>Радиолюбители</b><span>Сочи и все, кто с нами в эфире</span></div>
+  <div class="top"><div><b>Радиолюбители Сочи</b><span class="sub">Круглый стол, люди, чат</span></div>
+  <a class="user" id="login-link" href="login.html">Войти<span>кабинет</span></a></div>
   <nav>
     <button class="on" data-tab="home">Эфир</button>
     <button data-tab="people">Люди</button>
@@ -60,7 +59,6 @@
     <a href="kubok.html">Кубок</a>
     <a href="vedushchiy.html">Ведущему</a>
   </nav>
-  <a class="user" id="login-link" href="login.html">Войти<span>в свой кабинет</span></a>
 </header>
 <main>
   <section id="home">
