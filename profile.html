@@ -34,14 +34,14 @@
     <input name="city" id="city" placeholder="Город">
     <select name="locator" id="locator"><option value="">Локатор</option></select>
     <input name="phone" id="phone" placeholder="Телефон">
-    <input name="birth_date" id="birth_date" type="date" min="1920-01-01" max="2020-12-31" title="Дата рождения">
+    <input name="birth_date" id="birth_date" type="date" min="1920-01-01" max="2026-12-31" title="Дата рождения">
     <input name="email" id="email" type="email" placeholder="Почта" required>
     <textarea name="about" id="about" rows="3" placeholder="Коротко о себе"></textarea>
     <label><input type="checkbox" name="show_phone" id="show_phone" style="width:auto"> Показывать телефон всем</label>
     <label><input type="checkbox" name="show_birth" id="show_birth" style="width:auto"> Показывать год рождения всем</label>
-    <button>Сохранить</button>
     <p class="err" id="err"></p>
     <p class="ok" id="ok"></p>
+    <button id="save">Сохранить</button>
   </form>
   <a class="btn" href="chat.html">Открыть чат</a>
   <a class="btn ghost" href="/api/logout">Выйти</a>
@@ -68,13 +68,25 @@ fetch("/api/me").then(r=>r.json()).then(async me=>{
 });
 document.getElementById("edit").onsubmit = async (e) => {
   e.preventDefault();
-  document.getElementById("err").textContent = "";
-  document.getElementById("ok").textContent = "";
-  const res = await fetch("/api/profile", { method:"POST", body:new URLSearchParams(new FormData(e.target)) });
-  const data = await res.json().catch(()=>({}));
-  if(!res.ok){ document.getElementById("err").textContent = data.error || "Не сохранилось"; return; }
-  document.getElementById("ok").textContent = "Сохранено";
-  location.reload();
+  const err = document.getElementById("err");
+  const ok = document.getElementById("ok");
+  const button = document.getElementById("save");
+  err.textContent = "";
+  ok.textContent = "";
+  button.disabled = true;
+  button.textContent = "Сохраняю...";
+  try {
+    const res = await fetch("/api/profile", { method:"POST", body:new URLSearchParams(new FormData(e.target)) });
+    const data = await res.json().catch(()=>({}));
+    if(!res.ok){ err.textContent = data.error || "Не сохранилось"; return; }
+    ok.textContent = "Сохранено";
+    location.reload();
+  } catch (e) {
+    err.textContent = "Сервер не ответил";
+  } finally {
+    button.disabled = false;
+    button.textContent = "Сохранить";
+  }
 };
 </script>
 </body>

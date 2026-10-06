@@ -405,7 +405,7 @@ class Handler(SimpleHTTPRequestHandler):
                     birth = f"{parts[2]}-{parts[1]}-{parts[0]}"
                 try:
                     y, m, d = [int(x) for x in birth.split("-")]
-                    if not 1920 <= y <= 2020:
+                    if not 1920 <= y <= 2026:
                         raise ValueError
                 except Exception:
                     return self.send_json({"error": "Дата рождения: день, месяц и год, например 15.04.1970."}, 400)
@@ -415,8 +415,14 @@ class Handler(SimpleHTTPRequestHandler):
             if taken:
                 return self.send_json({"error": "Эта почта уже занята."}, 409)
             year_sql = str(int(year)) if year else "NULL"
-            psql(f"""UPDATE site_accounts SET name={q(name)}, email={q(email)}, surname={q(surname)}, patronymic={q(patronymic)}, city={q(city)}, locator={q(locator)}, phone={q(phone)}, about={q(about)}, birth_year={year_sql}, birth_date={date_sql}, show_phone={show_phone}, show_birth={show_birth} WHERE callsign={q(call)};""")
-            psql(f"""UPDATE operators SET name={q(name)}, surname={q(surname)}, patronymic={q(patronymic)}, city={q(city)}, locator={q(locator)}, phone={q(phone)}, about={q(about)} WHERE callsign={q(call)};""")
+            try:
+                psql(f"""UPDATE site_accounts SET name={q(name)}, email={q(email)}, surname={q(surname)}, patronymic={q(patronymic)}, city={q(city)}, locator={q(locator)}, phone={q(phone)}, about={q(about)}, birth_year={year_sql}, birth_date={date_sql}, show_phone={show_phone}, show_birth={show_birth} WHERE callsign={q(call)};""")
+            except Exception as exc:
+                return self.send_json({"error": str(exc) or "Не сохранилось"}, 500)
+            try:
+                psql(f"""UPDATE operators SET name={q(name)}, surname={q(surname)}, patronymic={q(patronymic)}, city={q(city)}, locator={q(locator)}, phone={q(phone)}, about={q(about)} WHERE callsign={q(call)};""")
+            except Exception:
+                pass
             return self.send_json({"ok": True})
         if path in ("/api/enter", "/api/register", "/api/forgot", "/api/reset"):
             try:
