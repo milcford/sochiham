@@ -145,9 +145,9 @@
   <section id="ads" class="hide">
     <h2>Объявления</h2>
     <form class="card" id="ad-form" onsubmit="addAd(event)">
-      <select id="kind"><option>Продаю</option><option>Куплю</option><option>Отдам</option></select>
-      <input id="what" placeholder="Что именно" required>
-      <input id="where" placeholder="Район или город">
+      <select id="kind" name="kind"><option>Продаю</option><option>Куплю</option><option>Отдам</option></select>
+      <input id="what" name="what" placeholder="Что именно" required>
+      <input id="where" name="where" placeholder="Район или город">
       <button class="big">Добавить</button>
       <p id="ad-err"></p>
     </form>
