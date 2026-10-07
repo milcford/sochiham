@@ -9,9 +9,9 @@
   * { box-sizing: border-box; }
   body { margin:0; font-family: "Segoe UI", "Segoe UI Emoji", "Noto Color Emoji", "Apple Color Emoji", sans-serif; background:var(--bg); color:var(--ink); height:100dvh; display:flex; flex-direction:column; }
 
-  .sitehead { background:#fff; border-bottom:1px solid #e4e7e4; padding:14px 20px; display:flex; justify-content:space-between; align-items:center; }
+  .sitehead, header.sitehead { background:#fff; border-bottom:1px solid #e4e7e4; padding:14px 20px; display:flex; justify-content:space-between; align-items:center; gap:16px; }
   .sitehead b { font-size:18px; }
-  .sitehead .user { color:#1f6b45; text-decoration:none; font-weight:700; }
+  .sitehead .user { color:#1f6b45; text-decoration:none; font-weight:700; margin-left:auto; width:auto; }
   .sitenav { display:flex; gap:4px; flex-wrap:wrap; background:#fff; border-bottom:1px solid #e4e7e4; padding:0 12px; }
   .sitenav a, .sitenav button { color:#5e6a62; text-decoration:none; font-weight:650; padding:10px 12px; border:0; border-bottom:2px solid transparent; background:transparent; width:auto; font-size:15px; cursor:pointer; border-radius:0; margin:0; }
   .sitenav a.on, .sitenav button.on { color:#1a1f1c; border-bottom-color:#1f6b45; }
