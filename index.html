@@ -8,7 +8,14 @@
   :root { --ink:#1a1f1c; --muted:#5e6a62; --line:#e4e7e4; --bg:#f6f7f6; --card:#fff; --accent:#1f6b45; }
   * { box-sizing:border-box; }
   body { margin:0; font-family: "Segoe UI", system-ui, sans-serif; background:var(--bg); color:var(--ink); }
-  header { background:#fff; border-bottom:1px solid var(--line); padding:0 28px; position:sticky; top:0; z-index:5; }
+
+  .sitehead { background:#fff; border-bottom:1px solid #e4e7e4; padding:14px 20px; display:flex; justify-content:space-between; align-items:center; }
+  .sitehead b { font-size:18px; }
+  .sitehead .user { color:#1f6b45; text-decoration:none; font-weight:700; }
+  .sitenav { display:flex; gap:4px; flex-wrap:wrap; background:#fff; border-bottom:1px solid #e4e7e4; padding:0 12px; }
+  .sitenav a, .sitenav button { color:#5e6a62; text-decoration:none; font-weight:650; padding:10px 12px; border:0; border-bottom:2px solid transparent; background:transparent; width:auto; font-size:15px; cursor:pointer; border-radius:0; margin:0; }
+  .sitenav a.on, .sitenav button.on { color:#1a1f1c; border-bottom-color:#1f6b45; }
+  header { background:#fff; }
   .top { display:flex; justify-content:space-between; align-items:center; height:64px; }
   header b { font-size:18px; font-weight:700; }
   header .sub { color:var(--muted); font-size:13px; margin-left:10px; font-weight:500; }
@@ -76,10 +83,8 @@
 </style>
 </head>
 <body>
-<header>
-  <div class="top"><div><b>Радиолюбители Сочи</b><span class="sub">145.525 МГц · воскресенье 9:00</span></div>
-  <a class="user" id="login-link" href="login.html">Войти<span>кабинет</span></a></div>
-  <nav>
+<header class="sitehead"><b>Радиолюбители Сочи</b><a class="user" id="login-link" href="login.html">Войти</a></header>
+<nav class="sitenav">
     <button class="on" data-tab="home">Главная</button>
     <button data-tab="air">Эфир</button>
     <button data-tab="people">Люди</button>
@@ -89,8 +94,7 @@
     <a href="chat.html">Чат</a>
     <a href="kubok.html">Кубок</a>
     <a href="vedushchiy.html">Ведущему</a>
-  </nav>
-</header>
+</nav>
 <main>
   <section id="home">
     <div class="hero">
