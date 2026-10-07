@@ -8,7 +8,14 @@
   :root { --orange:#1f6b45; --green:#1b7a3a; --ink:#1c1917; --muted:#78716c; --bg:#f6f7f6; --card:#fff; }
   * { box-sizing: border-box; }
   body { margin:0; font-family: "Segoe UI", "Segoe UI Emoji", "Noto Color Emoji", "Apple Color Emoji", sans-serif; background:var(--bg); color:var(--ink); height:100dvh; display:flex; flex-direction:column; }
-  header { background:#fff; border-bottom:3px solid var(--orange); padding:12px 16px; display:flex; align-items:center; justify-content:space-between; gap:12px; }
+
+  .sitehead { background:#fff; border-bottom:1px solid #e4e7e4; padding:14px 20px; display:flex; justify-content:space-between; align-items:center; }
+  .sitehead b { font-size:18px; }
+  .sitehead .user { color:#1f6b45; text-decoration:none; font-weight:700; }
+  .sitenav { display:flex; gap:4px; flex-wrap:wrap; background:#fff; border-bottom:1px solid #e4e7e4; padding:0 12px; }
+  .sitenav a, .sitenav button { color:#5e6a62; text-decoration:none; font-weight:650; padding:10px 12px; border:0; border-bottom:2px solid transparent; background:transparent; width:auto; font-size:15px; cursor:pointer; border-radius:0; margin:0; }
+  .sitenav a.on, .sitenav button.on { color:#1a1f1c; border-bottom-color:#1f6b45; }
+
   header b { font-size:18px; }
   header span { color:var(--muted); font-size:13px; display:block; }
   a.back { color:var(--orange); font-weight:700; text-decoration:none; white-space:nowrap; }
@@ -47,10 +54,7 @@
 </style>
 </head>
 <body>
-<header>
-  <div><b>Радиолюбители Сочи</b><span>Чат · письма остаются</span></div>
-  <a class="back" href="index.html">Главная</a>
-</header>
+<header class="sitehead"><b>Радиолюбители Сочи</b><a class="user" id="who-link" href="login.html">Войти</a></header>
 <nav class="sitenav">
   <a href="index.html">Главная</a>
   <a href="index.html#air">Эфир</a>
@@ -58,10 +62,14 @@
   <a href="index.html#photo">Фото</a>
   <a href="index.html#video">Видео</a>
   <a href="index.html#ads">Объявления</a>
-  <a class="on" href="chat.html">Чат</a>
+  <a href="chat.html" class="on">Чат</a>
   <a href="kubok.html">Кубок</a>
   <a href="vedushchiy.html">Ведущему</a>
 </nav>
+<script>
+const who=document.cookie.match(/ham_call=([^;]+)/);
+if(who){const a=document.getElementById("who-link"); if(a){a.textContent=decodeURIComponent(who[1]); a.href="profile.html";}}
+</script>
 <div class="rooms">
   <button class="on" data-room="general">Общий</button>
   <button data-room="table">Круглый стол</button>

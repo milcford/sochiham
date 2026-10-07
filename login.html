@@ -20,10 +20,32 @@
   .err { color:#b91c1c; }
   .ok { color:#1b7a3a; }
   .hide { display:none; }
+
+  .sitehead { background:#fff; border-bottom:1px solid #e4e7e4; padding:14px 20px; display:flex; justify-content:space-between; align-items:center; }
+  .sitehead b { font-size:18px; }
+  .sitehead .user { color:#1f6b45; text-decoration:none; font-weight:700; }
+  .sitenav { display:flex; gap:4px; flex-wrap:wrap; background:#fff; border-bottom:1px solid #e4e7e4; padding:0 12px; }
+  .sitenav a, .sitenav button { color:#5e6a62; text-decoration:none; font-weight:650; padding:10px 12px; border:0; border-bottom:2px solid transparent; background:transparent; width:auto; font-size:15px; cursor:pointer; border-radius:0; margin:0; }
+  .sitenav a.on, .sitenav button.on { color:#1a1f1c; border-bottom-color:#1f6b45; }
 </style>
 </head>
 <body>
-<header><b>Радиолюбители Сочи</b><a href="index.html">Главная</a></header>
+<header class="sitehead"><b>Радиолюбители Сочи</b><a class="user" id="who-link" href="login.html">Войти</a></header>
+<nav class="sitenav">
+  <a href="index.html">Главная</a>
+  <a href="index.html#air">Эфир</a>
+  <a href="index.html#people">Люди</a>
+  <a href="index.html#photo">Фото</a>
+  <a href="index.html#video">Видео</a>
+  <a href="index.html#ads">Объявления</a>
+  <a href="chat.html">Чат</a>
+  <a href="kubok.html">Кубок</a>
+  <a href="vedushchiy.html">Ведущему</a>
+</nav>
+<script>
+const who=document.cookie.match(/ham_call=([^;]+)/);
+if(who){const a=document.getElementById("who-link"); if(a){a.textContent=decodeURIComponent(who[1]); a.href="profile.html";}}
+</script>
 <main>
   <h1>Вход</h1>
   <p id="who" class="ok"></p>

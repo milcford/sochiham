@@ -30,7 +30,7 @@
 </style>
 </head>
 <body>
-<header><b>Радиолюбители Сочи</b></header>
+<header class="sitehead"><b>Радиолюбители Сочи</b><a class="user" id="who-link" href="login.html">Войти</a></header>
 <nav class="sitenav">
   <a href="index.html">Главная</a>
   <a href="index.html#air">Эфир</a>
@@ -39,9 +39,13 @@
   <a href="index.html#video">Видео</a>
   <a href="index.html#ads">Объявления</a>
   <a href="chat.html">Чат</a>
-  <a class="on" href="kubok.html">Кубок</a>
+  <a href="kubok.html" class="on">Кубок</a>
   <a href="vedushchiy.html">Ведущему</a>
 </nav>
+<script>
+const who=document.cookie.match(/ham_call=([^;]+)/);
+if(who){const a=document.getElementById("who-link"); if(a){a.textContent=decodeURIComponent(who[1]); a.href="profile.html";}}
+</script>
 <main>
   <h1>Кубок Сочи, УКВ</h1>
   <p>Точка на карте сама даёт локатор. Километры считаются по прямой. Если оба в одном малом квадрате, очки фиксированные: 2, 2 и 3.</p>
