@@ -168,6 +168,9 @@
 </div>
 <script>
 document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{document.querySelectorAll("nav button").forEach(x=>x.classList.remove("on")); b.classList.add("on"); ["home","air","people","photo","video","ads"].forEach(id=>document.getElementById(id).classList.toggle("hide", id!==b.dataset.tab));});
+const openTab=location.hash.slice(1);
+if(["air","people","photo","video","ads"].includes(openTab)){ const b=document.querySelector('nav button[data-tab="'+openTab+'"]'); if(b) b.click(); }
+
 let meCall="";
 function adCard(a){
   const who=(a.callsign||"")+(a.name?" · "+a.name:"");

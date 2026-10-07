@@ -12,6 +12,9 @@
   header b { font-size:18px; }
   header span { color:var(--muted); font-size:13px; display:block; }
   a.back { color:var(--orange); font-weight:700; text-decoration:none; white-space:nowrap; }
+  .sitenav { display:flex; gap:4px; flex-wrap:wrap; background:#fff; border-bottom:1px solid #e4e7e4; padding:0 16px; }
+  .sitenav a { color:#5e6a62; text-decoration:none; font-weight:650; padding:10px 12px; border-bottom:2px solid transparent; }
+  .sitenav a.on { color:#1a1f1c; border-bottom-color:#1f6b45; }
   .rooms { display:flex; gap:8px; padding:10px 12px 0; max-width:860px; width:100%; margin:0 auto; }
   .rooms button { border:1px solid #e7e5e4; background:#fff; border-radius:999px; padding:8px 12px; font-weight:700; cursor:pointer; }
   .rooms button.on { background:var(--orange); color:#fff; border-color:var(--orange); }
@@ -45,9 +48,20 @@
 </head>
 <body>
 <header>
-  <div><b>Чат</b><span>Письма остаются. Можно листать вверх.</span></div>
+  <div><b>Радиолюбители Сочи</b><span>Чат · письма остаются</span></div>
   <a class="back" href="index.html">Главная</a>
 </header>
+<nav class="sitenav">
+  <a href="index.html">Главная</a>
+  <a href="index.html#air">Эфир</a>
+  <a href="index.html#people">Люди</a>
+  <a href="index.html#photo">Фото</a>
+  <a href="index.html#video">Видео</a>
+  <a href="index.html#ads">Объявления</a>
+  <a class="on" href="chat.html">Чат</a>
+  <a href="kubok.html">Кубок</a>
+  <a href="vedushchiy.html">Ведущему</a>
+</nav>
 <div class="rooms">
   <button class="on" data-room="general">Общий</button>
   <button data-room="table">Круглый стол</button>
