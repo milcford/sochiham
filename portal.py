@@ -63,9 +63,9 @@ def ham_token(callsign):
 
 def ensure_login():
     psql("""CREATE TABLE IF NOT EXISTS site_accounts (
-      callsign text PRIMARY KEY,
+      email text PRIMARY KEY,
+      callsign text NOT NULL UNIQUE,
       name text NOT NULL,
-      email text NOT NULL,
       password text NOT NULL,
       reset_token text DEFAULT '',
       reset_until timestamptz
@@ -526,6 +526,33 @@ class Handler(SimpleHTTPRequestHandler):
             keep.append(a)
         save_ads(keep)
         return self.send_json({"ok": True, "ads": keep})
+
+    def photos_save(self):
+        if not self.cookie_ok(): return self.send_json({"error": "auth"}, 401)
+        length = int(self.headers.get("Content-Length", "0"))
+        raw = self.rfile.read(min(length, 500000))
+        try:
+            data = json.loads(raw.decode() or "{}")
+        except Exception:
+            return self.send_json({"error": "bad json"}, 400)
+        old = load_album()
+        new = save_album(data)
+        drop_removed_photos(old, new)
+        return self.send_json({"ok": True, "album": new})
+
+    def videos_save(self):
+        if not self.cookie_ok(): return self.send_json({"error": "auth"}, 401)
+        length = int(self.headers.get("Content-Length", "0"))
+        raw = self.rfile.read(min(length, 500000))
+        try:
+            data = json.loads(raw.decode() or "{}")
+        except Exception:
+            return self.send_json({"error": "bad json"}, 400)
+        old = load_videos()
+        new = save_videos(data)
+        drop_removed_videos(old, new)
+        return self.send_json({"ok": True, "videos": new})
+
     def do_POST(self):
         path = self.path.split("?", 1)[0]
         if path == "/api/messages":
@@ -695,7 +722,7 @@ const $ = s => document.querySelector(s);
 async function api(path, opt){ const r = await fetch(path, opt); if(r.status===401) throw new Error("auth"); return r.json(); }
 function tab(name){ document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("on", b.dataset.tab===name)); ["people","host","logs","photos","videos"].forEach(id=>$( "#"+id).classList.toggle("hide", id!==name)); }
 document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>tab(b.dataset.tab));
-async function loadPeople(){ const list = await api("/api/operators"); $("#cards").innerHTML = list.map(p=>'<div class=person><span>'+p.callsign+' — '+[p.surname,p.name,p.patronymic].filter(Boolean).join(" ")+'</span><button onclick=edit('+JSON.stringify(p).replace(/"/g,""")+')>Изменить</button><button onclick=del('+p.id+')>Удалить</button></div>').join("") || "Пока никого"; }
+async function loadPeople(){ const list = await api("/api/operators"); $("#cards").innerHTML = list.map(p=>'<div class=person><span>'+p.callsign+' — '+[p.surname,p.name,p.patronymic].filter(Boolean).join(" ")+'</span><button onclick=edit('+JSON.stringify(p).replace(/"/g,"&quot;")+')>Изменить</button><button onclick=del('+p.id+')>Удалить</button></div>').join("") || "Пока никого"; }
 async function loadLogs(){ const list = await api("/api/logs"); $("#logs-list").innerHTML = list.map(l=>'<div class=log><span>'+l.worked_at+' '+l.my_call+' — '+l.dx_call+' '+l.band+'</span><button onclick=delLog('+l.id+')>Удалить</button></div>').join("") || "Нет связей"; }
 async function loadPhotos(){ const a = await api("/api/photos"); $("#photo-form [name=title]").value = a.title||""; $("#photo-form [name=subtitle]").value = a.subtitle||""; $("#photo-form [name=note]").value = a.note||""; $("#photo-list").innerHTML = (a.items||[]).map((it,i)=>'<div class=shotrow><img src="/'+it.file+'"><div class=shotbtns><button type=button onclick=movePhoto('+i+',-1)>↑</button><button type=button onclick=movePhoto('+i+',1)>↓</button><button type=button onclick=delPhoto('+i+')>Удалить</button></div><input value="'+ (it.title||"") +'" onchange=renamePhoto('+i+',this.value)></div>').join(""); }
 async function loadVideos(){ const a = await api("/api/videos"); $("#video-form [name=title]").value = a.title||""; $("#video-form [name=subtitle]").value = a.subtitle||""; $("#video-list").innerHTML = (a.items||[]).map((it,i)=>'<div class=shotrow><video src="/'+it.file+'" controls style="width:100%;max-height:240px"></video><div class=shotbtns><button type=button onclick=moveVideo('+i+',-1)>↑</button><button type=button onclick=moveVideo('+i+',1)>↓</button><button type=button onclick=delVideo('+i+')>Удалить</button></div><input value="'+ (it.title||"") +'" onchange=renameVideo('+i+',this.value)></div>').join(""); }
