@@ -525,7 +525,7 @@ class Handler(SimpleHTTPRequestHandler):
         if not call:
             return self.send_json({"error": "Сначала войдите."}, 401)
         length = int(self.headers.get("Content-Length", "0"))
-        raw = self.rfile.read(min(length, 200000))
+        raw = self.rfile.read(min(length, 8000000))
         try:
             form = json.loads(raw.decode() or "{}")
         except Exception:
