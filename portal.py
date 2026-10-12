@@ -411,20 +411,14 @@ class Handler(SimpleHTTPRequestHandler):
             result = []
             letters = "ABCDEFGHIJKLMNOPQRSTUVWX"
             expand = {"KN93", "KN94"}  # Сочи и Туапсе — полные точные квадраты
-            short = {
-                "KN93": "Сочи и окрестности",
-                "KN94": "Туапсе, Геленджик",
-            }
             for item in base:
                 code = item["code"]
                 title = item["title"]
                 if code in expand:
-                    place = short.get(code, title)
-                    result.append({"code": code, "title": place + " (общий квадрат)"})
+                    result.append({"code": code, "title": title + " (общий)"})
                     for a in letters:
                         for b in letters:
-                            grid = code + a + b
-                            result.append({"code": grid, "title": grid + " — " + place})
+                            result.append({"code": code + a + b, "title": code + a + b})
                 else:
                     result.append(item)
             return self.send_json(result)
