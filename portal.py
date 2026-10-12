@@ -534,10 +534,23 @@ class Handler(SimpleHTTPRequestHandler):
         what = (form.get("what") or "").strip()[:120]
         where = (form.get("where") or "").strip()[:80]
         desc = (form.get("desc") or "").strip()[:500]
+        photo_b64 = form.get("photo") or ""
         if not what:
             return self.send_json({"error": "Напишите, что именно"}, 400)
         ads = load_ads()
         new_id = max((a.get("id") or 0 for a in ads), default=0) + 1
+        photo_path = ""
+        if photo_b64:
+            import base64, re
+            folder = Path(__file__).resolve().parent / "photos" / "ads"
+            folder.mkdir(parents=True, exist_ok=True)
+            name = f"ad-{new_id}.jpg"
+            path = folder / name
+            try:
+                path.write_bytes(base64.b64decode(photo_b64))
+                photo_path = f"photos/ads/{name}"
+            except Exception:
+                pass
         ads.append({
             "id": new_id,
             "callsign": call,
@@ -547,7 +560,7 @@ class Handler(SimpleHTTPRequestHandler):
             "desc": desc,
             "title": kind + " " + what,
             "text": desc,
-            "photo": ""
+            "photo": photo_path
         })
         save_ads(ads)
         return self.send_json({"ok": True})
