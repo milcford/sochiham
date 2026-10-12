@@ -767,7 +767,8 @@ const $ = s => document.querySelector(s);
 async function api(path, opt){ const r = await fetch(path, opt); if(r.status===401) throw new Error("auth"); return r.json(); }
 function tab(name){ document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("on", b.dataset.tab===name)); ["people","host","logs","photos","videos"].forEach(id=>$( "#"+id).classList.toggle("hide", id!==name)); }
 document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>tab(b.dataset.tab));
-async function loadPeople(){ const list = await api("/api/operators"); $("#cards").innerHTML = list.map(p=>'<div class=person><span>'+p.callsign+' — '+[p.surname,p.name,p.patronymic].filter(Boolean).join(" ")+'</span><button onclick=edit('+JSON.stringify(p).replace(/"/g,"&quot;")+')>Изменить</button><button onclick=del('+p.id+')>Удалить</button></div>').join("") || "Пока никого"; }
+let peopleCache = [];
+async function loadPeople(){ peopleCache = await api("/api/operators"); $("#cards").innerHTML = peopleCache.map((p,i)=>'<div class=person><span>'+p.callsign+' — '+[p.surname,p.name,p.patronymic].filter(Boolean).join(" ")+'</span><button onclick=edit('+i+')>Изменить</button><button onclick=del('+p.id+')>Удалить</button></div>').join("") || "Пока никого"; }
 async function loadLogs(){ const list = await api("/api/logs"); $("#logs-list").innerHTML = list.map(l=>'<div class=log><span>'+l.worked_at+' '+l.my_call+' — '+l.dx_call+' '+l.band+'</span><button onclick=delLog('+l.id+')>Удалить</button></div>').join("") || "Нет связей"; }
 let albumsCache = [];
 let currentAlbumId = null;
