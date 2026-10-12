@@ -559,6 +559,54 @@ class Handler(SimpleHTTPRequestHandler):
         save_ads(keep)
         return self.send_json({"ok": True, "ads": keep})
 
+    def photo_upload(self):
+        if not self.cookie_ok(): return self.send_json({"error": "auth"}, 401)
+        length = int(self.headers.get("Content-Length", "0"))
+        raw = self.rfile.read(min(length, 8000000))
+        try:
+            data = json.loads(raw.decode() or "{}")
+        except Exception:
+            return self.send_json({"error": "bad json"}, 400)
+        album_id = str(data.get("album_id") or "").strip()
+        filename = str(data.get("filename") or "photo.jpg").strip()
+        b64 = data.get("data") or ""
+        if not album_id or not b64:
+            return self.send_json({"error": "нет альбома или файла"}, 400)
+        # безопасное имя
+        import re, base64
+        safe = re.sub(r"[^a-zA-Z0-9._-]", "_", filename)
+        if not safe.lower().endswith((".jpg", ".jpeg", ".png", ".gif", ".webp")):
+            safe += ".jpg"
+        folder = Path(__file__).resolve().parent / "photos" / album_id
+        folder.mkdir(parents=True, exist_ok=True)
+        path = folder / safe
+        # если файл уже есть — добавим номер
+        n = 1
+        stem, ext = path.stem, path.suffix
+        while path.exists():
+            path = folder / f"{stem}-{n}{ext}"
+            n += 1
+        try:
+            path.write_bytes(base64.b64decode(b64))
+        except Exception:
+            return self.send_json({"error": "не удалось сохранить"}, 400)
+        rel = f"photos/{album_id}/{path.name}"
+        # добавить в альбом
+        album = load_album()
+        albums = album.get("albums") or []
+        found = False
+        for a in albums:
+            if a.get("id") == album_id:
+                a.setdefault("items", []).append({"file": rel, "title": path.stem})
+                if not a.get("cover"):
+                    a["cover"] = rel
+                found = True
+                break
+        if not found:
+            albums.append({"id": album_id, "title": album_id, "subtitle": "", "note": "", "cover": rel, "items": [{"file": rel, "title": path.stem}]})
+        save_album({"albums": albums})
+        return self.send_json({"ok": True, "file": rel})
+
     def photos_save(self):
         if not self.cookie_ok(): return self.send_json({"error": "auth"}, 401)
         length = int(self.headers.get("Content-Length", "0"))
@@ -595,6 +643,8 @@ class Handler(SimpleHTTPRequestHandler):
             return self.ads_delete()
         if path == "/api/admin/photos":
             return self.photos_save()
+        if path == "/api/admin/photo-upload":
+            return self.photo_upload()
         if path == "/api/admin/videos":
             return self.videos_save()
         form = self.read_form()
@@ -758,6 +808,12 @@ ADMIN_PAGE = r'''<!DOCTYPE html><html lang=ru><head><meta charset=utf-8><meta na
     <textarea name=note placeholder="Заметка"></textarea>
     <button>Сохранить альбом</button>
   </form>
+  <form id=upload-form style="margin-top:12px">
+    <b>Загрузить фото в этот альбом</b>
+    <input type=file id=photo-file accept="image/*" multiple>
+    <button type=button onclick=uploadPhotos()>Загрузить</button>
+    <p id=upload-status></p>
+  </form>
   <div id=photo-list></div>
 </section>
 <section id=videos class=hide><form id=video-form><input name=title placeholder="Название"><input name=subtitle placeholder="Подзаголовок"><button>Сохранить</button></form><div id=video-list></div></section>
@@ -796,6 +852,29 @@ async function newAlbum(){
   albumsCache.push({id, title, subtitle:"", note:"", cover:"", items:[]});
   await api("/api/admin/photos", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({albums:albumsCache})});
   currentAlbumId = id;
+  loadPhotos();
+}
+async function uploadPhotos(){
+  const fileInput = document.getElementById("photo-file");
+  const status = document.getElementById("upload-status");
+  if(!currentAlbumId){ status.textContent = "Сначала выберите альбом"; return; }
+  if(!fileInput.files.length){ status.textContent = "Выберите фото"; return; }
+  status.textContent = "Загружаю...";
+  for(const file of fileInput.files){
+    const data = await new Promise(res => {
+      const r = new FileReader();
+      r.onload = () => res(r.result.split(",")[1]);
+      r.readAsDataURL(file);
+    });
+    const res = await api("/api/admin/photo-upload", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({album_id: currentAlbumId, filename: file.name, data})
+    });
+    if(res.error){ status.textContent = res.error; return; }
+  }
+  status.textContent = "Готово";
+  fileInput.value = "";
   loadPhotos();
 }
 async function loadVideos(){ const a = await api("/api/videos"); $("#video-form [name=title]").value = a.title||""; $("#video-form [name=subtitle]").value = a.subtitle||""; $("#video-list").innerHTML = (a.items||[]).map((it,i)=>'<div class=shotrow><video src="/'+it.file+'" controls style="width:100%;max-height:240px"></video><div class=shotbtns><button type=button onclick=moveVideo('+i+',-1)>↑</button><button type=button onclick=moveVideo('+i+',1)>↓</button><button type=button onclick=delVideo('+i+')>Удалить</button></div><input value="'+ (it.title||"") +'" onchange=renameVideo('+i+',this.value)></div>').join(""); }
