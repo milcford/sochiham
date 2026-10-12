@@ -55,7 +55,8 @@ if(who){const a=document.getElementById("who-link"); if(a){a.textContent=decodeU
     <input name="name" id="name" placeholder="Имя" required>
     <input name="patronymic" id="patronymic" placeholder="Отчество">
     <input name="city" id="city" placeholder="Город">
-    <input name="locator" id="locator" placeholder="QTH Grid, например KN93uo" maxlength="6" style="text-transform:uppercase">
+    <select name="locator" id="locator"><option value="">Локатор</option></select>
+    <input name="locator_custom" id="locator_custom" placeholder="Точный квадрат, например KN93uo" maxlength="6" style="text-transform:uppercase;display:none;margin-top:6px">
     <input name="phone" id="phone" placeholder="Телефон">
     <input name="birth_date" id="birth_date" type="date" min="1920-01-01" max="2026-12-31" title="Дата рождения">
     <input name="email" id="email" type="email" placeholder="Почта" required>
@@ -75,7 +76,14 @@ function line(title, value){ return value ? '<div class="row"><span>'+title+'</s
 fetch("/api/me").then(r=>r.json()).then(async me=>{
   if(!me.callsign){ location.href="login.html"; return; }
   document.getElementById("call").textContent = me.callsign;
-  fields.forEach(id => { const el=document.getElementById(id); if(el) el.value = me[id] || ""; });
+  fields.forEach(id => { const el=document.getElementById(id); if(el && id!=="locator") el.value = me[id] || ""; });
+  const loc = document.getElementById("locator");
+  const custom = document.getElementById("locator_custom");
+  const list = await fetch("/api/locators").then(r=>r.json()).catch(()=>[]);
+  loc.innerHTML = '<option value="">Локатор</option>' + list.map(x=>'<option value="'+x.code+'">'+x.code+' — '+x.title+'</option>').join("") + '<option value="__custom__">Свой точный квадрат</option>';
+  if(me.locator && list.some(x=>x.code===me.locator)) loc.value = me.locator;
+  else if(me.locator){ loc.value="__custom__"; custom.value=me.locator; custom.style.display="block"; }
+  loc.onchange = () => { custom.style.display = loc.value==="__custom__" ? "block" : "none"; if(loc.value!=="__custom__") custom.value=""; };
   document.getElementById("show_phone").checked = !!me.show_phone;
   document.getElementById("show_birth").checked = !!me.show_birth;
   document.getElementById("card").innerHTML =
@@ -86,6 +94,9 @@ fetch("/api/me").then(r=>r.json()).then(async me=>{
 });
 document.getElementById("edit").onsubmit = async (e) => {
   e.preventDefault();
+  const loc = document.getElementById("locator");
+  const custom = document.getElementById("locator_custom");
+  if(loc.value === "__custom__") loc.value = (custom.value || "").trim().toUpperCase();
   const err = document.getElementById("err");
   const ok = document.getElementById("ok");
   const button = document.getElementById("save");
