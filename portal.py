@@ -217,11 +217,12 @@ def load_album():
     if PHOTOS_FILE.exists():
         try:
             data = json.loads(PHOTOS_FILE.read_text(encoding="utf-8"))
-            if isinstance(data.get("items"), list):
+            # новый формат с альбомами или старый с items
+            if isinstance(data.get("albums"), list) or isinstance(data.get("items"), list):
                 return data
         except Exception:
             pass
-    return {"title": "Фото", "subtitle": "", "note": "", "items": []}
+    return {"albums": []}
 
 def save_album(data):
     PHOTOS_FILE.parent.mkdir(exist_ok=True)
