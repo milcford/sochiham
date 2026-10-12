@@ -137,10 +137,18 @@
     </div>
   </section>
   <section id="photo" class="hide">
-    <h2 id="photo-title">Фото</h2>
-    <p id="photo-sub"></p>
-    <div class="card hide" id="photo-note"></div>
-    <div class="grid" id="album"></div>
+    <div id="album-list-wrap">
+      <h2>Фото</h2>
+      <p style="color:#5e6a62">Выберите альбом</p>
+      <div class="grid" id="album-list"></div>
+    </div>
+    <div id="album-view" class="hide">
+      <button type="button" class="big ghost" onclick="showAlbumList()" style="margin-bottom:12px;width:auto">← Все альбомы</button>
+      <h2 id="photo-title">Фото</h2>
+      <p id="photo-sub"></p>
+      <div class="card hide" id="photo-note"></div>
+      <div class="grid" id="album"></div>
+    </div>
   </section>
   <section id="video" class="hide">
     <h2 id="video-title">Видео</h2>
@@ -233,28 +241,52 @@ async function people(){
 }
 round(); people(); setInterval(round, 5000);
 
-async function album(){
-  const box=document.getElementById("album");
-  if(!box) return;
+let albumsData = [];
+async function loadAlbums(){
+  const list = document.getElementById("album-list");
+  if(!list) return;
   let data=null;
   for (const url of ["/api/photos","/data/photos.json"]){
     try{
       const res=await fetch(url);
       if(!res.ok) continue;
       const body=await res.json();
-      if(body && body.items){ data=body; break; }
+      if(body && (body.albums || body.items)){ data=body; break; }
     }catch(e){}
   }
-  if(!data){ box.innerHTML="<p>Список фото не открылся. На сервере: git pull, затем заново python3 portal.py</p>"; return; }
-  document.getElementById("photo-title").textContent=data.title||"Фото";
-  document.getElementById("photo-sub").textContent=data.subtitle||"";
-  const note=document.getElementById("photo-note");
-  note.innerHTML=data.note?("<p>"+data.note+"</p>"):"";
-  note.classList.toggle("hide", !data.note);
-  shots=data.items||[];
-    box.innerHTML=shots.map((p,i)=>'<div class="shot"><button type="button" onclick="openView('+i+')"><img src="'+p.file+'" alt=""></button><p>'+(p.title||"")+'</p></div>').join("")||"<p>Пока нет фото</p>";
+  if(!data){ list.innerHTML="<p>Список альбомов не открылся.</p>"; return; }
+  // поддержка старого формата
+  if(data.items && !data.albums){
+    data = {albums:[{id:"main", title:data.title||"Фото", subtitle:data.subtitle||"", note:data.note||"", cover:(data.items[0]||{}).file||"", items:data.items}]};
+  }
+  albumsData = data.albums || [];
+  list.innerHTML = albumsData.map(a => {
+    const cover = a.cover || (a.items && a.items[0] ? a.items[0].file : "");
+    const count = (a.items||[]).length;
+    return `<div class="shot" style="cursor:pointer" onclick="openAlbum('${a.id}')"><img src="${cover}" alt=""><p>${a.title||""}<br><small>${count} фото</small></p></div>`;
+  }).join("") || "<p>Пока нет альбомов</p>";
+  document.getElementById("album-list-wrap").classList.remove("hide");
+  document.getElementById("album-view").classList.add("hide");
 }
-album();
+function openAlbum(id){
+  const a = albumsData.find(x => x.id === id);
+  if(!a) return;
+  document.getElementById("album-list-wrap").classList.add("hide");
+  document.getElementById("album-view").classList.remove("hide");
+  document.getElementById("photo-title").textContent = a.title || "Фото";
+  document.getElementById("photo-sub").textContent = a.subtitle || "";
+  const note = document.getElementById("photo-note");
+  note.innerHTML = a.note ? ("<p>"+a.note+"</p>") : "";
+  note.classList.toggle("hide", !a.note);
+  shots = a.items || [];
+  const box = document.getElementById("album");
+  box.innerHTML = shots.map((p,i)=>'<div class="shot"><button type="button" onclick="openView('+i+')"><img src="'+p.file+'" alt=""></button><p>'+(p.title||"")+'</p></div>').join("") || "<p>Пока нет фото</p>";
+}
+function showAlbumList(){
+  document.getElementById("album-view").classList.add("hide");
+  document.getElementById("album-list-wrap").classList.remove("hide");
+}
+loadAlbums();
 async function videos(){
   const box=document.getElementById("video-list");
   if(!box) return;
