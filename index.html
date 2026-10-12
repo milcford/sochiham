@@ -163,6 +163,7 @@
       <select id="kind" name="kind"><option>Продаю</option><option>Куплю</option><option>Отдам</option></select>
       <input id="what" name="what" placeholder="Что именно" required>
       <input id="where" name="where" placeholder="Район или город">
+      <textarea id="desc" name="desc" placeholder="Описание" rows="3"></textarea>
       <input name="photo" type="file" accept="image/*">
       <button class="big" id="ad-btn">Добавить</button>
       <p id="ad-err"></p>
@@ -190,7 +191,7 @@ function adCard(a){
   const img=a.photo?'<img src="'+a.photo+'" alt="" style="width:100%;border-radius:10px;margin-bottom:8px">':"";
   const own=meCall && meCall===a.callsign;
   const actions=own?'<button type="button" class="big ghost" onclick="editAd('+a.id+')">Исправить</button><button type="button" class="big ghost" onclick="delAd('+a.id+')">Снять</button>':"";
-  return '<div class="card">'+img+'<b>'+a.kind+" "+a.what+'</b><p>'+(a.where||"")+'</p><p>Разместил: '+who+'<br>'+contact+'</p>'+actions+'</div>';
+  return '<div class="card">'+img+'<b>'+a.kind+" "+a.what+'</b><p>'+(a.where||"")+'</p>'+(a.desc?'<p>'+a.desc+'</p>':'')+'<p>Разместил: '+who+'<br>'+contact+'</p>'+actions+'</div>';
 }
 let adRows=[];
 function editAd(id){
@@ -210,7 +211,14 @@ async function loadAds(){
 async function addAd(e){
   e.preventDefault();
   document.getElementById("ad-err").textContent="";
-  const res=await fetch("/api/ads",{method:"POST", body:new FormData(e.target)});
+  const fd = new FormData(e.target);
+  const body = {
+    kind: fd.get("kind") || "",
+    what: fd.get("what") || "",
+    where: fd.get("where") || "",
+    desc: fd.get("desc") || ""
+  };
+  const res=await fetch("/api/ads",{method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)});
   const data=await res.json();
   if(!res.ok){ document.getElementById("ad-err").textContent=data.error||"Не добавилось"; return; }
   e.target.reset();

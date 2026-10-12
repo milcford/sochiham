@@ -525,20 +525,32 @@ class Handler(SimpleHTTPRequestHandler):
         if not call:
             return self.send_json({"error": "Сначала войдите."}, 401)
         length = int(self.headers.get("Content-Length", "0"))
-        raw = self.rfile.read(min(length, 2000000))
+        raw = self.rfile.read(min(length, 200000))
         try:
-            data = json.loads(raw.decode() or "{}")
+            form = json.loads(raw.decode() or "{}")
         except Exception:
             return self.send_json({"error": "bad"}, 400)
-        title = (data.get("title") or "").strip()[:80]
-        text = (data.get("text") or "").strip()[:500]
-        if not title:
-            return self.send_json({"error": "Нужен заголовок"}, 400)
+        kind = (form.get("kind") or "Продаю").strip()[:20]
+        what = (form.get("what") or "").strip()[:120]
+        where = (form.get("where") or "").strip()[:80]
+        desc = (form.get("desc") or "").strip()[:500]
+        if not what:
+            return self.send_json({"error": "Напишите, что именно"}, 400)
         ads = load_ads()
         new_id = max((a.get("id") or 0 for a in ads), default=0) + 1
-        ads.append({"id": new_id, "callsign": call, "title": title, "text": text, "photo": ""})
+        ads.append({
+            "id": new_id,
+            "callsign": call,
+            "kind": kind,
+            "what": what,
+            "where": where,
+            "desc": desc,
+            "title": kind + " " + what,
+            "text": desc,
+            "photo": ""
+        })
         save_ads(ads)
-        return self.send_json({"ok": True, "ads": ads})
+        return self.send_json({"ok": True})
     def ads_delete(self):
         call = ham_from_cookie(self.headers.get("Cookie", ""))
         if not call and not self.cookie_ok():
