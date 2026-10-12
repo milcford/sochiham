@@ -568,10 +568,17 @@ class Handler(SimpleHTTPRequestHandler):
         call = ham_from_cookie(self.headers.get("Cookie", ""))
         if not call and not self.cookie_ok():
             return self.send_json({"error": "Сначала войдите."}, 401)
-        form = self.read_form()
-        try:
-            ad_id = int(form.get("id", "0"))
-        except Exception:
+        # id можно передать в адресе или в теле
+        qs = parse_qs(self.path.split("?", 1)[-1] if "?" in self.path else "")
+        ad_id = 0
+        if qs.get("id"):
+            try: ad_id = int(qs["id"][0])
+            except Exception: pass
+        if not ad_id:
+            form = self.read_form()
+            try: ad_id = int(form.get("id", "0"))
+            except Exception: pass
+        if not ad_id:
             return self.send_json({"error": "bad id"}, 400)
         keep = []
         for a in load_ads():
