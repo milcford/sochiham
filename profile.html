@@ -55,7 +55,7 @@ if(who){const a=document.getElementById("who-link"); if(a){a.textContent=decodeU
     <input name="name" id="name" placeholder="Имя" required>
     <input name="patronymic" id="patronymic" placeholder="Отчество">
     <input name="city" id="city" placeholder="Город">
-    <select name="locator" id="locator"><option value="">Локатор</option></select>
+    <input name="locator" id="locator" placeholder="QTH Grid, например KN93uo" maxlength="6" style="text-transform:uppercase">
     <input name="phone" id="phone" placeholder="Телефон">
     <input name="birth_date" id="birth_date" type="date" min="1920-01-01" max="2026-12-31" title="Дата рождения">
     <input name="email" id="email" type="email" placeholder="Почта" required>
@@ -75,12 +75,7 @@ function line(title, value){ return value ? '<div class="row"><span>'+title+'</s
 fetch("/api/me").then(r=>r.json()).then(async me=>{
   if(!me.callsign){ location.href="login.html"; return; }
   document.getElementById("call").textContent = me.callsign;
-  fields.forEach(id => { const el=document.getElementById(id); if(el && id!=="locator") el.value = me[id] || ""; });
-  const loc = document.getElementById("locator");
-  const list = await fetch("/api/locators").then(r=>r.json()).catch(()=>[]);
-  loc.innerHTML = '<option value="">Локатор</option>' + list.map(x=>'<option value="'+x.code+'">'+x.code+' — '+x.title+'</option>').join("");
-  if(me.locator && !list.some(x=>x.code===me.locator)) loc.insertAdjacentHTML("beforeend", '<option value="'+me.locator+'">'+me.locator+'</option>');
-  loc.value = me.locator || "";
+  fields.forEach(id => { const el=document.getElementById(id); if(el) el.value = me[id] || ""; });
   document.getElementById("show_phone").checked = !!me.show_phone;
   document.getElementById("show_birth").checked = !!me.show_birth;
   document.getElementById("card").innerHTML =

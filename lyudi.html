@@ -53,7 +53,7 @@ if(who){const a=document.getElementById("who-link"); if(a){a.textContent=decodeU
     <input name="name" placeholder="Имя" required>
     <input name="patronymic" placeholder="Отчество, если есть">
     <input name="city" placeholder="Город">
-    <select name="locator" id="locator"><option value="">Локатор</option></select>
+    <input name="locator" id="locator" placeholder="QTH Grid, например KN93uo" maxlength="6" style="text-transform:uppercase">
     <p>Телефон</p>
     <div class="phone">
       <select id="code"><option value="+7">+7</option><option value="+375">+375</option><option value="+374">+374</option><option value="+995">+995</option><option value="+380">+380</option></select>
@@ -67,7 +67,7 @@ if(who){const a=document.getElementById("who-link"); if(a){a.textContent=decodeU
 <script>
 function mask(v){const d=v.replace(/\D/g,'').slice(0,10); let s=d.slice(0,3); if(d.length>3)s+=' '+d.slice(3,6); if(d.length>6)s+='-'+d.slice(6,8); if(d.length>8)s+='-'+d.slice(8,10); return s;}
 document.getElementById('number').addEventListener('input', e=>{e.target.value=mask(e.target.value);});
-fetch('/api/locators').then(r=>r.json()).then(list=>{document.getElementById('locator').innerHTML='<option value="">Локатор</option>'+list.map(x=>'<option value="'+x.code+'">'+x.code+' — '+x.title+'</option>').join('');});
+
 function fill(p){const f=document.getElementById('edit'); for (const k of ['callsign','surname','name','patronymic','city','locator']) f[k].value=p[k]||''; const digits=(p.phone||'').replace(/\D/g,''); const code=['+375','+374','+995','+380','+7'].find(c=>digits.startsWith(c.slice(1)))||'+7'; document.getElementById('code').value=code; document.getElementById('number').value=mask(digits.slice(code.length-1));}
 async function lookup(){document.getElementById('qrz-err').textContent=''; const res=await fetch('/api/qrz?call='+encodeURIComponent(document.getElementById('edit').callsign.value)); const data=await res.json(); if(!res.ok){document.getElementById('qrz-err').textContent=data.error||'Не нашлось'; return;} fill(data);}
 document.getElementById('edit').onsubmit=async(e)=>{e.preventDefault(); const digits=document.getElementById('number').value.replace(/\D/g,''); e.target.phone.value=digits?document.getElementById('code').value+' '+document.getElementById('number').value:''; const res=await fetch('/api/join',{method:'POST', body:new URLSearchParams(new FormData(e.target))}); if(!res.ok){document.getElementById('err').textContent='Не сохранилось'; return;} document.getElementById('done').hidden=false; e.target.reset(); document.getElementById('number').value='';};
