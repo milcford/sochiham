@@ -410,11 +410,11 @@ class Handler(SimpleHTTPRequestHandler):
             base = [dict(zip(["code","title"], line.split("|"))) for line in rows.splitlines() if line.strip()]
             result = []
             letters = "ABCDEFGHIJKLMNOPQRSTUVWX"
+            expand = {"KN93", "KN94"}  # Сочи и Туапсе — полные точные квадраты
             for item in base:
                 code = item["code"]
                 title = item["title"]
-                if len(code) == 4:
-                    # добавляем сам квадрат и все точные 6-значные
+                if code in expand:
                     result.append({"code": code, "title": title + " (общий)"})
                     for a in letters:
                         for b in letters:
