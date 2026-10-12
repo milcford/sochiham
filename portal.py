@@ -226,29 +226,46 @@ def load_album():
 
 def save_album(data):
     PHOTOS_FILE.parent.mkdir(exist_ok=True)
-    clean = []
-    for item in data.get("items") or []:
-        file = str(item.get("file") or "").replace("\\", "/").lstrip("/")
-        if not file.startswith("photos/") or ".." in file:
-            continue
-        path = Path(__file__).resolve().parent / file
-        if not path.is_file():
-            continue
-        clean.append({"file": file, "title": str(item.get("title") or "Снимок")[:200]})
-    out = {
-        "title": str(data.get("title") or "Фото")[:80],
-        "subtitle": str(data.get("subtitle") or "")[:120],
-        "note": str(data.get("note") or "")[:500],
-        "items": clean,
-    }
+    albums = data.get("albums")
+    if not isinstance(albums, list):
+        # fallback: treat as single album
+        albums = [data]
+    clean_albums = []
+    for a in albums:
+        items = []
+        for item in a.get("items") or []:
+            file = str(item.get("file") or "").replace("\\", "/").lstrip("/")
+            if not file.startswith("photos/") or ".." in file:
+                continue
+            path = Path(__file__).resolve().parent / file
+            if not path.is_file():
+                continue
+            items.append({"file": file, "title": str(item.get("title") or "Снимок")[:200]})
+        cover = str(a.get("cover") or (items[0]["file"] if items else ""))
+        clean_albums.append({
+            "id": str(a.get("id") or "album")[:80],
+            "title": str(a.get("title") or "Фото")[:80],
+            "subtitle": str(a.get("subtitle") or "")[:120],
+            "note": str(a.get("note") or "")[:500],
+            "cover": cover,
+            "items": items,
+        })
+    out = {"albums": clean_albums}
     PHOTOS_FILE.write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8")
     return out
 
 def drop_removed_photos(old, new):
-    keep = {item["file"] for item in new.get("items") or []}
+    def files_of(data):
+        res = set()
+        for a in data.get("albums") or []:
+            for item in a.get("items") or []:
+                res.add(item.get("file") or "")
+        for item in data.get("items") or []:
+            res.add(item.get("file") or "")
+        return res
+    keep = files_of(new)
     root = Path(__file__).resolve().parent
-    for item in old.get("items") or []:
-        file = item.get("file") or ""
+    for file in files_of(old):
         if file in keep or not file.startswith("photos/") or ".." in file:
             continue
         path = root / file
@@ -715,7 +732,19 @@ ADMIN_PAGE = r'''<!DOCTYPE html><html lang=ru><head><meta charset=utf-8><meta na
 <section id=people><form id=edit><input name=id type=hidden><input name=phone type=hidden><input name=callsign placeholder=Позывной required><button class=ghost type=button onclick=lookup()>Найти на qrz.ru</button><p class=err id=qrz-err></p><input name=surname placeholder=Фамилия><input name=name placeholder=Имя required><input name=patronymic placeholder="Отчество, если есть"><input name=city placeholder=Город><select name=locator id=locator><option value="">Локатор</option></select><p class=hint>Телефон</p><div class=phone><select id=code><option value="+7">+7</option><option value="+375">+375</option><option value="+374">+374</option><option value="+995">+995</option><option value="+380">+380</option></select><input id=number inputmode=numeric placeholder="918 123-45-67" maxlength=13></div><button>Сохранить</button></form><div class=card id=cards></div></section>
 <section id=host class=hide><form id=host-form><b>Ведущий круглого стола</b><input name=callsign list=host-calls placeholder="Позывной ведущего" autocomplete=off><datalist id=host-calls></datalist><input id=host-pass name=password placeholder="Пароль для ведущего"><button class=ghost type=button onclick=makePass()>Придумать пароль</button><button>Назначить ведущего</button></form></section>
 <section id=logs class=hide><div class=card id=logs-list></div><button class=ghost onclick=delAll()>Удалить все связи</button></section>
-<section id=photos class=hide><form id=photo-form><input name=title placeholder="Название альбома"><input name=subtitle placeholder="Подзаголовок"><textarea name=note placeholder="Заметка"></textarea><button>Сохранить альбом</button></form><div id=photo-list></div></section>
+<section id=photos class=hide>
+  <div style="margin-bottom:12px">
+    <select id=album-select onchange=loadPhotos() style="padding:8px;font-size:16px;width:auto;margin-right:8px"></select>
+    <button type=button onclick=newAlbum()>Новый альбом</button>
+  </div>
+  <form id=photo-form>
+    <input name=title placeholder="Название альбома">
+    <input name=subtitle placeholder="Подзаголовок">
+    <textarea name=note placeholder="Заметка"></textarea>
+    <button>Сохранить альбом</button>
+  </form>
+  <div id=photo-list></div>
+</section>
 <section id=videos class=hide><form id=video-form><input name=title placeholder="Название"><input name=subtitle placeholder="Подзаголовок"><button>Сохранить</button></form><div id=video-list></div></section>
 </div>
 <script>
@@ -725,7 +754,34 @@ function tab(name){ document.querySelectorAll("nav button").forEach(b=>b.classLi
 document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>tab(b.dataset.tab));
 async function loadPeople(){ const list = await api("/api/operators"); $("#cards").innerHTML = list.map(p=>'<div class=person><span>'+p.callsign+' — '+[p.surname,p.name,p.patronymic].filter(Boolean).join(" ")+'</span><button onclick=edit('+JSON.stringify(p).replace(/"/g,"&quot;")+')>Изменить</button><button onclick=del('+p.id+')>Удалить</button></div>').join("") || "Пока никого"; }
 async function loadLogs(){ const list = await api("/api/logs"); $("#logs-list").innerHTML = list.map(l=>'<div class=log><span>'+l.worked_at+' '+l.my_call+' — '+l.dx_call+' '+l.band+'</span><button onclick=delLog('+l.id+')>Удалить</button></div>').join("") || "Нет связей"; }
-async function loadPhotos(){ const a = await api("/api/photos"); $("#photo-form [name=title]").value = a.title||""; $("#photo-form [name=subtitle]").value = a.subtitle||""; $("#photo-form [name=note]").value = a.note||""; $("#photo-list").innerHTML = (a.items||[]).map((it,i)=>'<div class=shotrow><img src="/'+it.file+'"><div class=shotbtns><button type=button onclick=movePhoto('+i+',-1)>↑</button><button type=button onclick=movePhoto('+i+',1)>↓</button><button type=button onclick=delPhoto('+i+')>Удалить</button></div><input value="'+ (it.title||"") +'" onchange=renamePhoto('+i+',this.value)></div>').join(""); }
+let albumsCache = [];
+let currentAlbumId = null;
+async function loadPhotos(){
+  const data = await api("/api/photos");
+  albumsCache = data.albums || [];
+  if(!albumsCache.length && data.items){
+    albumsCache = [{id:"main", title:data.title||"Фото", subtitle:data.subtitle||"", note:data.note||"", items:data.items}];
+  }
+  const sel = $("#album-select");
+  const prev = sel.value || currentAlbumId;
+  sel.innerHTML = albumsCache.map(a => `<option value="${a.id}">${a.title||a.id}</option>`).join("");
+  if(prev && albumsCache.some(a => a.id === prev)) sel.value = prev;
+  else if(albumsCache.length) sel.value = albumsCache[0].id;
+  currentAlbumId = sel.value;
+  const a = albumsCache.find(x => x.id === currentAlbumId) || {title:"", subtitle:"", note:"", items:[]};
+  $("#photo-form [name=title]").value = a.title||"";
+  $("#photo-form [name=subtitle]").value = a.subtitle||"";
+  $("#photo-form [name=note]").value = a.note||"";
+  $("#photo-list").innerHTML = (a.items||[]).map((it,i)=>'<div class=shotrow><img src="/'+it.file+'"><div class=shotbtns><button type=button onclick=movePhoto('+i+',-1)>↑</button><button type=button onclick=movePhoto('+i+',1)>↓</button><button type=button onclick=delPhoto('+i+')>Удалить</button></div><input value="'+ (it.title||"") +'" onchange=renamePhoto('+i+',this.value)></div>').join("") || "<p>В альбоме пока нет фото</p>";
+}
+async function newAlbum(){
+  const title = prompt("Название нового альбома") || "Новый альбом";
+  const id = "album-" + Date.now();
+  albumsCache.push({id, title, subtitle:"", note:"", cover:"", items:[]});
+  await api("/api/admin/photos", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({albums:albumsCache})});
+  currentAlbumId = id;
+  loadPhotos();
+}
 async function loadVideos(){ const a = await api("/api/videos"); $("#video-form [name=title]").value = a.title||""; $("#video-form [name=subtitle]").value = a.subtitle||""; $("#video-list").innerHTML = (a.items||[]).map((it,i)=>'<div class=shotrow><video src="/'+it.file+'" controls style="width:100%;max-height:240px"></video><div class=shotbtns><button type=button onclick=moveVideo('+i+',-1)>↑</button><button type=button onclick=moveVideo('+i+',1)>↓</button><button type=button onclick=delVideo('+i+')>Удалить</button></div><input value="'+ (it.title||"") +'" onchange=renameVideo('+i+',this.value)></div>').join(""); }
 $("#login").onsubmit = async e => { e.preventDefault(); const r = await fetch("/login", {method:"POST", body:new URLSearchParams(new FormData(e.target))}); if(r.ok){ $("#login").hidden=true; $("#app").hidden=false; loadPeople(); loadLogs(); loadPhotos(); loadVideos(); } else $("#login-err").textContent="Неверный пароль"; };
 $("#edit").onsubmit = async e => { e.preventDefault(); const fd = new FormData(e.target); fd.set("phone", $("#code").value + " " + $("#number").value); await api("/api/operators", {method:"POST", body:new URLSearchParams(fd)}); e.target.reset(); loadPeople(); };
@@ -736,10 +792,42 @@ async function delAll(){ if(confirm("Удалить все связи?")) { awai
 async function lookup(){ const call=$("#edit [name=callsign]").value.trim(); if(!call) return; try { const d = await api("/api/qrz?call="+encodeURIComponent(call)); $("#edit [name=surname]").value=d.surname||""; $("#edit [name=name]").value=d.name||""; $("#edit [name=patronymic]").value=d.patronymic||""; $("#edit [name=city]").value=d.city||""; $("#edit [name=locator]").value=d.locator||""; if(d.phone){ const m=d.phone.match(/^(\+\d+)\s*(.*)/); if(m){ $("#code").value=m[1]; $("#number").value=m[2]; } } } catch(e){ $("#qrz-err").textContent = e.message || "Не найден"; } }
 function makePass(){ $("#host-pass").value = Math.random().toString(36).slice(2,10); }
 $("#host-form").onsubmit = async e => { e.preventDefault(); await api("/api/round/host", {method:"POST", body:new URLSearchParams(new FormData(e.target))}); alert("Готово"); };
-async function movePhoto(i, dir){ const a = await api("/api/photos"); const items=a.items||[]; const j=i+dir; if(j<0||j>=items.length) return; [items[i],items[j]]=[items[j],items[i]]; await api("/api/admin/photos", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({...a, items})}); loadPhotos(); }
-async function delPhoto(i){ if(!confirm("Удалить фото?")) return; const a = await api("/api/photos"); a.items.splice(i,1); await api("/api/admin/photos", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(a)}); loadPhotos(); }
-async function renamePhoto(i, title){ const a = await api("/api/photos"); a.items[i].title=title; await api("/api/admin/photos", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(a)}); }
-$("#photo-form").onsubmit = async e => { e.preventDefault(); const a = await api("/api/photos"); const fd=new FormData(e.target); await api("/api/admin/photos", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({title:fd.get("title"), subtitle:fd.get("subtitle"), note:fd.get("note"), items:a.items||[]})}); alert("Сохранено"); };
+async function movePhoto(i, dir){
+  const a = albumsCache.find(x => x.id === currentAlbumId);
+  if(!a) return;
+  const items = a.items||[];
+  const j = i+dir;
+  if(j<0 || j>=items.length) return;
+  [items[i], items[j]] = [items[j], items[i]];
+  await api("/api/admin/photos", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({albums:albumsCache})});
+  loadPhotos();
+}
+async function delPhoto(i){
+  if(!confirm("Удалить фото?")) return;
+  const a = albumsCache.find(x => x.id === currentAlbumId);
+  if(!a) return;
+  a.items.splice(i,1);
+  await api("/api/admin/photos", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({albums:albumsCache})});
+  loadPhotos();
+}
+async function renamePhoto(i, title){
+  const a = albumsCache.find(x => x.id === currentAlbumId);
+  if(!a) return;
+  a.items[i].title = title;
+  await api("/api/admin/photos", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({albums:albumsCache})});
+}
+$("#photo-form").onsubmit = async e => {
+  e.preventDefault();
+  const a = albumsCache.find(x => x.id === currentAlbumId);
+  if(!a) return;
+  const fd = new FormData(e.target);
+  a.title = fd.get("title") || a.title;
+  a.subtitle = fd.get("subtitle") || "";
+  a.note = fd.get("note") || "";
+  await api("/api/admin/photos", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({albums:albumsCache})});
+  alert("Сохранено");
+  loadPhotos();
+};
 async function moveVideo(i, dir){ const a = await api("/api/videos"); const items=a.items||[]; const j=i+dir; if(j<0||j>=items.length) return; [items[i],items[j]]=[items[j],items[i]]; await api("/api/admin/videos", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({...a, items})}); loadVideos(); }
 async function delVideo(i){ if(!confirm("Удалить видео?")) return; const a = await api("/api/videos"); a.items.splice(i,1); await api("/api/admin/videos", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(a)}); loadVideos(); }
 async function renameVideo(i, title){ const a = await api("/api/videos"); a.items[i].title=title; await api("/api/admin/videos", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(a)}); }
