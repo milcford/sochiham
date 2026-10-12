@@ -562,7 +562,7 @@ class Handler(SimpleHTTPRequestHandler):
     def photo_upload(self):
         if not self.cookie_ok(): return self.send_json({"error": "auth"}, 401)
         length = int(self.headers.get("Content-Length", "0"))
-        raw = self.rfile.read(min(length, 8000000))
+        raw = self.rfile.read(min(length, 15000000))
         try:
             data = json.loads(raw.decode() or "{}")
         except Exception:
@@ -854,26 +854,53 @@ async function newAlbum(){
   currentAlbumId = id;
   loadPhotos();
 }
+async function resizeImage(file){
+  return new Promise(resolve => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const max = 1600;
+      let w = img.width, h = img.height;
+      if(w > max || h > max){
+        if(w > h){ h = Math.round(h * max / w); w = max; }
+        else { w = Math.round(w * max / h); h = max; }
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, w, h);
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.82);
+      resolve(dataUrl.split(",")[1]);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
+    img.src = url;
+  });
+}
 async function uploadPhotos(){
   const fileInput = document.getElementById("photo-file");
   const status = document.getElementById("upload-status");
   if(!currentAlbumId){ status.textContent = "Сначала выберите альбом"; return; }
   if(!fileInput.files.length){ status.textContent = "Выберите фото"; return; }
-  status.textContent = "Загружаю...";
+  status.textContent = "Сжимаю и загружаю...";
+  let ok = 0;
   for(const file of fileInput.files){
-    const data = await new Promise(res => {
-      const r = new FileReader();
-      r.onload = () => res(r.result.split(",")[1]);
-      r.readAsDataURL(file);
-    });
-    const res = await api("/api/admin/photo-upload", {
-      method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({album_id: currentAlbumId, filename: file.name, data})
-    });
-    if(res.error){ status.textContent = res.error; return; }
+    const data = await resizeImage(file);
+    if(!data){ status.textContent = "Не удалось прочитать " + file.name; continue; }
+    try {
+      const res = await api("/api/admin/photo-upload", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({album_id: currentAlbumId, filename: file.name.replace(/\.[^.]+$/, ".jpg"), data})
+      });
+      if(res && res.error){ status.textContent = res.error; return; }
+      ok++;
+    } catch(e){
+      status.textContent = "Ошибка загрузки: " + (e.message || "слишком большой файл");
+      return;
+    }
   }
-  status.textContent = "Готово";
+  status.textContent = "Загружено: " + ok;
   fileInput.value = "";
   loadPhotos();
 }
