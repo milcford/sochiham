@@ -407,7 +407,21 @@ class Handler(SimpleHTTPRequestHandler):
             return self.send_json([dict(zip(["callsign","name","city","locator","phone","birth_year"], line.split("|"))) for line in rows.splitlines() if line.strip()])
         if path.startswith("/api/locators"):
             rows = psql("SELECT code, title FROM locators ORDER BY code;")
-            return self.send_json([dict(zip(["code","title"], line.split("|"))) for line in rows.splitlines() if line.strip()])
+            base = [dict(zip(["code","title"], line.split("|"))) for line in rows.splitlines() if line.strip()]
+            result = []
+            letters = "ABCDEFGHIJKLMNOPQRSTUVWX"
+            for item in base:
+                code = item["code"]
+                title = item["title"]
+                if len(code) == 4:
+                    # добавляем сам квадрат и все точные 6-значные
+                    result.append({"code": code, "title": title + " (общий)"})
+                    for a in letters:
+                        for b in letters:
+                            result.append({"code": code + a + b, "title": code + a + b})
+                else:
+                    result.append(item)
+            return self.send_json(result)
         if path.startswith("/api/qrz"):
             call = parse_qs(self.path.split("?", 1)[-1]).get("call", [""])[0].strip().upper()
             try: return self.send_json(qrz_lookup(call))
