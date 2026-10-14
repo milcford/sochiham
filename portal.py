@@ -639,6 +639,29 @@ class Handler(SimpleHTTPRequestHandler):
         save_album({"albums": albums})
         return self.send_json({"ok": True, "file": rel})
 
+    def profile_photo(self):
+        call = ham_from_cookie(self.headers.get("Cookie", ""))
+        if not call:
+            return self.send_json({"error": "Сначала войдите."}, 401)
+        length = int(self.headers.get("Content-Length", "0"))
+        raw = self.rfile.read(min(length, 3000000))
+        try:
+            data = json.loads(raw.decode() or "{}")
+        except Exception:
+            return self.send_json({"error": "bad"}, 400)
+        b64 = data.get("data") or ""
+        if not b64:
+            return self.send_json({"error": "нет фото"}, 400)
+        import base64
+        folder = Path(__file__).resolve().parent / "photos" / "profiles"
+        folder.mkdir(parents=True, exist_ok=True)
+        path = folder / f"{call}.jpg"
+        try:
+            path.write_bytes(base64.b64decode(b64))
+        except Exception:
+            return self.send_json({"error": "не удалось сохранить"}, 400)
+        return self.send_json({"ok": True, "file": f"photos/profiles/{call}.jpg"})
+
     def photos_save(self):
         if not self.cookie_ok(): return self.send_json({"error": "auth"}, 401)
         length = int(self.headers.get("Content-Length", "0"))
@@ -673,6 +696,8 @@ class Handler(SimpleHTTPRequestHandler):
             return self.ads_post()
         if path == "/api/ads/delete":
             return self.ads_delete()
+        if path == "/api/profile/photo":
+            return self.profile_photo()
         if path == "/api/admin/photos":
             return self.photos_save()
         if path == "/api/admin/photo-upload":

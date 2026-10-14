@@ -50,6 +50,13 @@ if(who){const a=document.getElementById("who-link"); if(a){a.textContent=decodeU
     <div id="card"></div>
   </div>
   <form class="card" id="edit">
+    <div style="text-align:center;margin-bottom:12px">
+      <img id="avatar" src="" alt="" style="width:120px;height:120px;object-fit:cover;border-radius:50%;background:#f3f4f3;display:none">
+      <div id="avatar-placeholder" style="width:120px;height:120px;border-radius:50%;background:#f3f4f3;margin:0 auto;display:flex;align-items:center;justify-content:center;color:#8a938c">Фото</div>
+    </div>
+    <input type="file" id="photo" accept="image/*" style="margin-bottom:8px">
+    <button type="button" class="btn ghost" onclick="uploadPhoto()" style="margin-bottom:12px">Загрузить фото</button>
+    <p id="photo-status" style="color:#8a938c;font-size:13px"></p>
     <input name="new_callsign" id="new_callsign" placeholder="Новый позывной (если нужно сменить)" maxlength="12">
     <input name="surname" id="surname" placeholder="Фамилия">
     <input name="name" id="name" placeholder="Имя" required>
@@ -76,6 +83,11 @@ function line(title, value){ return value ? '<div class="row"><span>'+title+'</s
 fetch("/api/me").then(r=>r.json()).then(async me=>{
   if(!me.callsign){ location.href="login.html"; return; }
   document.getElementById("call").textContent = me.callsign;
+  const av = document.getElementById("avatar");
+  const ph = document.getElementById("avatar-placeholder");
+  av.src = "/photos/profiles/" + me.callsign + ".jpg?" + Date.now();
+  av.onload = () => { av.style.display = "block"; ph.style.display = "none"; };
+  av.onerror = () => { av.style.display = "none"; ph.style.display = "flex"; };
   fields.forEach(id => { const el=document.getElementById(id); if(el && id!=="locator") el.value = me[id] || ""; });
   const loc = document.getElementById("locator");
   const custom = document.getElementById("locator_custom");
@@ -117,6 +129,41 @@ document.getElementById("edit").onsubmit = async (e) => {
     button.textContent = "Сохранить";
   }
 };
+async function uploadPhoto(){
+  const input = document.getElementById("photo");
+  const status = document.getElementById("photo-status");
+  if(!input.files.length){ status.textContent = "Выберите фото"; return; }
+  status.textContent = "Загружаю...";
+  const file = input.files[0];
+  const data = await new Promise(resolve => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const max = 400;
+      let w = img.width, h = img.height;
+      if(w > max || h > max){
+        if(w > h){ h = Math.round(h * max / w); w = max; }
+        else { w = Math.round(w * max / h); h = max; }
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = w; canvas.height = h;
+      canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL("image/jpeg", 0.85).split(",")[1]);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(""); };
+    img.src = url;
+  });
+  if(!data){ status.textContent = "Не удалось прочитать фото"; return; }
+  const res = await fetch("/api/profile/photo", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({data})});
+  const json = await res.json();
+  if(!res.ok){ status.textContent = json.error || "Не загрузилось"; return; }
+  status.textContent = "Фото сохранено";
+  const av = document.getElementById("avatar");
+  av.src = "/photos/profiles/" + document.getElementById("call").textContent + ".jpg?" + Date.now();
+  av.style.display = "block";
+  document.getElementById("avatar-placeholder").style.display = "none";
+}
 </script>
 </body>
 </html>

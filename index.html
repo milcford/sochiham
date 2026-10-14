@@ -265,7 +265,7 @@ async function round(){
 async function people(){
   try {
     const rows=await fetch('/api/calls').then(r=>r.json());
-    document.getElementById('people-list').innerHTML='<div class="person heads"><b>Позывной</b><span>Имя</span><span>Город</span><span>Локатор</span><span>Телефон</span><span>Год</span></div>'+rows.map(p=>'<div class="person"><b>'+p.callsign+'</b><span>'+(p.name||'')+'</span><span>'+(p.city||'')+'</span><span>'+(p.locator||'')+'</span><span>'+(p.phone||'')+'</span><span>'+(p.birth_year||'')+'</span></div>').join('')||'<div class="row"><span>пока никого нет</span></div>';
+    document.getElementById('people-list').innerHTML='<div class="person heads"><b>Позывной</b><span>Имя</span><span>Город</span><span>Локатор</span><span>Телефон</span><span>Год</span></div>'+rows.map(p=>'<div class="person"><b><img src="/photos/profiles/'+p.callsign+'.jpg" onerror="this.style.display=\'none\'" style="width:28px;height:28px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:6px">'+p.callsign+'</b><span>'+(p.name||'')+'</span><span>'+(p.city||'')+'</span><span>'+(p.locator||'')+'</span><span>'+(p.phone||'')+'</span><span>'+(p.birth_year||'')+'</span></div>').join('')||'<div class="row"><span>пока никого нет</span></div>';
   } catch(e) {
     document.getElementById('people-list').innerHTML='<div class="row"><span>список не открылся</span></div>';
   }
