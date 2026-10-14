@@ -660,19 +660,20 @@ class Handler(SimpleHTTPRequestHandler):
         except Exception:
             return self.send_json({"error": "не удалось сохранить"}, 400)
         rel = f"photos/{album_id}/{path.name}"
+        title = str(data.get("title") or path.stem)[:200]
         # добавить в альбом
         album = load_album()
         albums = album.get("albums") or []
         found = False
         for a in albums:
             if a.get("id") == album_id:
-                a.setdefault("items", []).append({"file": rel, "title": path.stem})
+                a.setdefault("items", []).append({"file": rel, "title": title})
                 if not a.get("cover"):
                     a["cover"] = rel
                 found = True
                 break
         if not found:
-            albums.append({"id": album_id, "title": album_id, "subtitle": "", "note": "", "cover": rel, "items": [{"file": rel, "title": path.stem}]})
+            albums.append({"id": album_id, "title": album_id, "subtitle": "", "note": "", "cover": rel, "items": [{"file": rel, "title": title}]})
         save_album({"albums": albums})
         return self.send_json({"ok": True, "file": rel})
 

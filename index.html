@@ -157,6 +157,7 @@
       <div id="album-upload" class="card hide" style="margin-bottom:12px">
         <b>Добавить фото</b>
         <input type="file" id="album-file" accept="image/*" multiple>
+        <input id="album-photo-desc" placeholder="Описание фото (необязательно)">
         <button type="button" class="big" onclick="uploadToAlbum()">Загрузить</button>
         <p id="album-upload-status" style="color:#5e6a62"></p>
       </div>
@@ -393,13 +394,15 @@ async function uploadToAlbum(){
       img.src = url;
     });
     if(!data) continue;
-    const res = await fetch("/api/admin/photo-upload", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({album_id: window.currentAlbumId, filename: file.name, data})});
+    const desc = document.getElementById("album-photo-desc").value.trim();
+    const res = await fetch("/api/admin/photo-upload", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({album_id: window.currentAlbumId, filename: file.name, data, title: desc || file.name})});
     const json = await res.json();
     if(res.ok) ok++;
     else { status.textContent = json.error || "Ошибка"; return; }
   }
   status.textContent = "Загружено: " + ok;
   input.value = "";
+  document.getElementById("album-photo-desc").value = "";
   loadAlbums();
   setTimeout(() => openAlbum(window.currentAlbumId), 300);
 }
