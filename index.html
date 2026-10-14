@@ -140,6 +140,13 @@
     <div id="album-list-wrap">
       <h2>Фото</h2>
       <p style="color:#5e6a62">Выберите альбом</p>
+      <div id="album-create" class="card hide" style="margin-bottom:12px">
+        <b>Новый альбом</b>
+        <input id="new-album-title" placeholder="Название альбома">
+        <input id="new-album-sub" placeholder="Подзаголовок (необязательно)">
+        <button type="button" class="big" onclick="createAlbum()">Создать альбом</button>
+        <p id="album-create-status" style="color:#5e6a62"></p>
+      </div>
       <div class="grid" id="album-list"></div>
     </div>
     <div id="album-view" class="hide">
@@ -147,6 +154,12 @@
       <h2 id="photo-title">Фото</h2>
       <p id="photo-sub"></p>
       <div class="card hide" id="photo-note"></div>
+      <div id="album-upload" class="card hide" style="margin-bottom:12px">
+        <b>Добавить фото</b>
+        <input type="file" id="album-file" accept="image/*" multiple>
+        <button type="button" class="big" onclick="uploadToAlbum()">Загрузить</button>
+        <p id="album-upload-status" style="color:#5e6a62"></p>
+      </div>
       <div class="grid" id="album"></div>
     </div>
   </section>
@@ -300,6 +313,7 @@ async function loadAlbums(){
   document.getElementById("album-view").classList.add("hide");
 }
 function openAlbum(id){
+  window.currentAlbumId = id;
   const a = albumsData.find(x => x.id === id);
   if(!a) return;
   document.getElementById("album-list-wrap").classList.add("hide");
@@ -318,6 +332,12 @@ function showAlbumList(){
   document.getElementById("album-list-wrap").classList.remove("hide");
 }
 loadAlbums();
+fetch("/api/me").then(r=>r.json()).then(me=>{
+  if(me.callsign){
+    document.getElementById("album-create").classList.remove("hide");
+    document.getElementById("album-upload").classList.remove("hide");
+  }
+}).catch(()=>{});
 async function videos(){
   const box=document.getElementById("video-list");
   if(!box) return;
@@ -331,6 +351,59 @@ async function videos(){
 videos();
 let shots=[];
 let shotAt=0;
+async function createAlbum(){
+  const title = document.getElementById("new-album-title").value.trim();
+  const sub = document.getElementById("new-album-sub").value.trim();
+  const status = document.getElementById("album-create-status");
+  if(!title){ status.textContent = "Напишите название"; return; }
+  status.textContent = "Создаю...";
+  const res = await fetch("/api/albums/create", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({title, subtitle:sub})});
+  const data = await res.json();
+  if(!res.ok){ status.textContent = data.error || "Не создалось"; return; }
+  status.textContent = "Альбом создан";
+  document.getElementById("new-album-title").value = "";
+  document.getElementById("new-album-sub").value = "";
+  loadAlbums();
+}
+async function uploadToAlbum(){
+  const input = document.getElementById("album-file");
+  const status = document.getElementById("album-upload-status");
+  if(!window.currentAlbumId){ status.textContent = "Сначала откройте альбом"; return; }
+  if(!input.files.length){ status.textContent = "Выберите фото"; return; }
+  status.textContent = "Загружаю...";
+  let ok = 0;
+  for(const file of input.files){
+    const data = await new Promise(resolve => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        const max = 1600;
+        let w = img.width, h = img.height;
+        if(w > max || h > max){
+          if(w > h){ h = Math.round(h * max / w); w = max; }
+          else { w = Math.round(w * max / h); h = max; }
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = w; canvas.height = h;
+        canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL("image/jpeg", 0.82).split(",")[1]);
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); resolve(""); };
+      img.src = url;
+    });
+    if(!data) continue;
+    const res = await fetch("/api/admin/photo-upload", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({album_id: window.currentAlbumId, filename: file.name, data})});
+    const json = await res.json();
+    if(res.ok) ok++;
+    else { status.textContent = json.error || "Ошибка"; return; }
+  }
+  status.textContent = "Загружено: " + ok;
+  input.value = "";
+  loadAlbums();
+  setTimeout(() => openAlbum(window.currentAlbumId), 300);
+}
+
 function openView(i){ if(!shots.length) return; shotAt=(i+shots.length)%shots.length; const s=shots[shotAt]; document.getElementById("view-img").src=s.file; document.getElementById("view-cap").textContent=(s.title||"")+" · "+(shotAt+1)+" / "+shots.length; document.getElementById("viewer").classList.remove("hide"); }
 function closeView(){ document.getElementById("viewer").classList.add("hide"); }
 function stepView(d){ openView(shotAt+d); }

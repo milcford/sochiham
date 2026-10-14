@@ -591,8 +591,45 @@ class Handler(SimpleHTTPRequestHandler):
         save_ads(keep)
         return self.send_json({"ok": True, "ads": keep})
 
+    def album_create(self):
+        call = ham_from_cookie(self.headers.get("Cookie", ""))
+        if not call:
+            return self.send_json({"error": "Сначала войдите."}, 401)
+        length = int(self.headers.get("Content-Length", "0"))
+        raw = self.rfile.read(min(length, 10000))
+        try:
+            data = json.loads(raw.decode() or "{}")
+        except Exception:
+            return self.send_json({"error": "bad"}, 400)
+        title = str(data.get("title") or "").strip()[:80]
+        if not title:
+            return self.send_json({"error": "Нужно название"}, 400)
+        import re
+        album_id = re.sub(r"[^a-zA-Z0-9_-]", "-", title.lower())[:40] or "album"
+        album = load_album()
+        albums = album.get("albums") or []
+        # уникальный id
+        base = album_id
+        n = 1
+        while any(a.get("id") == album_id for a in albums):
+            album_id = f"{base}-{n}"
+            n += 1
+        albums.append({
+            "id": album_id,
+            "title": title,
+            "subtitle": str(data.get("subtitle") or "")[:120],
+            "note": "",
+            "cover": "",
+            "items": [],
+            "author": call
+        })
+        save_album({"albums": albums})
+        return self.send_json({"ok": True, "id": album_id})
+
     def photo_upload(self):
-        if not self.cookie_ok(): return self.send_json({"error": "auth"}, 401)
+        call = ham_from_cookie(self.headers.get("Cookie", ""))
+        if not call and not self.cookie_ok():
+            return self.send_json({"error": "Сначала войдите."}, 401)
         length = int(self.headers.get("Content-Length", "0"))
         raw = self.rfile.read(min(length, 15000000))
         try:
@@ -700,6 +737,8 @@ class Handler(SimpleHTTPRequestHandler):
             return self.profile_photo()
         if path == "/api/admin/photos":
             return self.photos_save()
+        if path == "/api/albums/create":
+            return self.album_create()
         if path == "/api/admin/photo-upload":
             return self.photo_upload()
         if path == "/api/admin/videos":
