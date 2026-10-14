@@ -185,6 +185,11 @@
     <div id="adlist"></div>
   </section>
 </main>
+<div id="person-view" class="viewer hide" onclick="closePerson()">
+  <button type="button" class="vx" onclick="closePerson()">Закрыть</button>
+  <img id="person-img" alt="" style="max-width:90vw;max-height:80vh;border-radius:12px">
+  <p id="person-cap" style="color:#fff;text-align:center;margin-top:8px"></p>
+</div>
 <footer>сайт создан R6AAA<br>
 <a href="https://www.qrz.ru/" target="_blank" rel="noopener">QRZ.RU — Сервер радиолюбителей России</a></footer>
 <div id="viewer" class="viewer hide">
@@ -279,7 +284,7 @@ async function round(){
 async function people(){
   try {
     const rows=await fetch('/api/calls').then(r=>r.json());
-    document.getElementById('people-list').innerHTML='<div class="person heads"><b>Позывной</b><span>Имя</span><span>Город</span><span>Локатор</span><span>Телефон</span><span>Год</span></div>'+rows.map(p=>'<div class="person"><b><img src="/photos/profiles/'+p.callsign+'.jpg" onerror="this.style.display=\'none\'" style="width:28px;height:28px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:6px">'+p.callsign+'</b><span>'+(p.name||'')+'</span><span>'+(p.city||'')+'</span><span>'+(p.locator||'')+'</span><span>'+(p.phone||'')+'</span><span>'+(p.birth_year||'')+'</span></div>').join('')||'<div class="row"><span>пока никого нет</span></div>';
+    document.getElementById('people-list').innerHTML='<div class="person heads"><b>Позывной</b><span>Имя</span><span>Город</span><span>Локатор</span><span>Телефон</span><span>Год</span></div>'+rows.map(p=>'<div class="person"><b><img src="/photos/profiles/'+p.callsign+'.jpg" onerror="this.style.display=\'none\'" onclick="showPerson(\''+p.callsign+'\',\''+(p.name||'')+'\')" style="width:36px;height:36px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:6px;cursor:pointer">'+p.callsign+'</b><span>'+(p.name||'')+'</span><span>'+(p.city||'')+'</span><span>'+(p.locator||'')+'</span><span>'+(p.phone||'')+'</span><span>'+(p.birth_year||'')+'</span></div>').join('')||'<div class="row"><span>пока никого нет</span></div>';
   } catch(e) {
     document.getElementById('people-list').innerHTML='<div class="row"><span>список не открылся</span></div>';
   }
@@ -422,6 +427,17 @@ fetch("/api/me").then(r=>r.json()).then(me=>{
   link.href="profile.html";
   link.innerHTML=me.callsign+"<span>"+(me.name||"кабинет")+"</span>";
 }).catch(()=>{});
+function showPerson(call, name){
+  const v = document.getElementById("person-view");
+  const img = document.getElementById("person-img");
+  const cap = document.getElementById("person-cap");
+  img.src = "/photos/profiles/" + call + ".jpg?" + Date.now();
+  cap.textContent = call + (name ? " — " + name : "");
+  v.classList.remove("hide");
+}
+function closePerson(){
+  document.getElementById("person-view").classList.add("hide");
+}
 </script>
 </body>
 </html>
